@@ -23,8 +23,14 @@ public class DuplicateFinder {
         List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readScv(csvFile);
 
 
-
-
+        for (Map.Entry<Long, Map<String, Object>> thingEntry : thingList.entrySet()) {
+            if (!csvContains(thingEntry.getValue().get("serial").toString(), csvFileList) &&
+                    thingEntry.getValue().get("parent_id") == null) {
+                deleteThing(thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()));
+            } else {
+                mergeThing(thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()), csvFileList);
+            }
+        }
 
 //        StringBuilder sb = new StringBuilder();
 //        sb.append("\n ");
@@ -62,7 +68,23 @@ public class DuplicateFinder {
 
     }
 
-    public static void closeConnections(){
+    private static void mergeThing(Map<String, Object> value, Map<String, Long> thingFieldMap, List<Map<String, Object>> csvFileList) {
+
+    }
+
+    private static void deleteThing(Map<String, Object> thingMap, Map<String, Long> thingFieldMap) {
+
+    }
+
+    private static boolean csvContains(String serial, List<Map<String, Object>> csvFileList) {
+        boolean result = false;
+        for (Map<String, Object> item : csvFileList) {
+            result = result || item.get("serial").equals(serial);
+        }
+        return result;
+    }
+
+    public static void closeConnections() {
 
     }
 
