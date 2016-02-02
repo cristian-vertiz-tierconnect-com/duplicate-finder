@@ -6,14 +6,21 @@ import com.mojix.dao.DbDAO;
 import com.mojix.driver.Cassandra;
 import com.mojix.utils.Console;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.*;
+import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.Date;
 import java.util.List;
 
 public class DuplicateFinder {
 
     private static String[] car = {"|", "/", "-", "\\"};
+
+    private static String[] csvHeader = {"Action", "Date", "Serial", "Id", "IsInCsv", "IsParent", "DbRowsAffected", "CassandraRowsAffected"};
 
     public static void findDuplicates()
             throws ClassNotFoundException,
@@ -27,6 +34,9 @@ public class DuplicateFinder {
         Map<Long, Map<String, Object>> thingList = DbDAO.getInstance().getThingList(ArgsCache.database);
         List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readScv(ArgsCache.csvFile);
 
+        List<String> results = new ArrayList<>();
+        results.add(buildHeaderCsv());
+
         //Loop things from mysql/mssql
         //If thing is nor in csv file and thing has no child "delete" else "merge"
         for (Map.Entry<Long, Map<String, Object>> thingEntry : thingList.entrySet()) {
@@ -34,63 +44,85 @@ public class DuplicateFinder {
             boolean isParent = isParent(thingEntry.getValue(), thingList);
 
             if (!contains && !isParent) {
-                deleteThing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()));
+                results.add(deleteThing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey())));
             } else if (!contains) {
-                mergeThing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()), csvFileList);
+                results.add(mergeThing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()), csvFileList));
             }
         }
 
-//        StringBuilder sb = new StringBuilder();
-//        sb.append("\n ");
-//        sb.append("\n================================ Summary ================================");
-//        sb.append("\n Total blinks (according to cassandra) -------------> " + totalBLinks);
-//        sb.append("\n Total blinks (according to mongo) -----------------> " + totalBLinksMong);
-//        sb.append("\n Things in mysql -----------------------------------> " + thingList.entrySet().size());
-//        sb.append("\n Things in cassandra -------------------------------> " + thingTimeCount.entrySet().size());
-//        sb.append("\n Things in mongo -----------------------------------> " + thingMongoList.size());
-//        sb.append("\n Missing things in mysql but existing in mongo -----> " + missing);
-//        sb.append("\n ");
-//        sb.append("\n Total cassandra rows in field_value_history -------> " + countFVH);
-//        sb.append("\n Total cassandra orphans in field_value_history ----> " + fvhOrphan);
-//        sb.append("\n ");
-//        sb.append("\n Total cassandra rows in field_value ---------------> " + countFV);
-//        sb.append("\n Total cassandra orphans in field_value ------------> " + fvOrphan);
-//        sb.append("\n=========================================================================");
-//        sb.append("\n ");
-//
-//        System.out.print(sb);
-//
-//        String fileName = "results_" + (new SimpleDateFormat("YYYYMMddhhmmss").format(new Date())) + ".txt";
-//        File file = new File(fileName);
-//        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-//        try {
-//            writer.write(sb.toString());
-//            writer.write("\n\n");
-//            writer.write(sbThingsMissing.toString());
-//            writer.write("\n\n");
-//            writer.write(sbBLinksPerThingCassandra.toString());
-//        } finally {
-//            if (writer != null) writer.close();
-//            System.out.println("***Results have been written to file  " + fileName);
-//        }
+        saveTofile(results);
 
+    }
+
+    private static void saveTofile(List<String> results) throws IOException {
+        String fileName = "results_" + (new SimpleDateFormat("YYYYMMddhhmmss").format(new Date())) + ".csv";
+        File file = new File(fileName);
+        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
+        try {
+            for (String row : results) {
+                writer.write(row + "\n");
+            }
+        } finally {
+            if (writer != null) writer.close();
+            System.out.println("*** Results have been written to csv file  " + fileName);
+        }
     }
 
     private static String mergeThing(Long thingId,
-                                   Map<String, Object> value,
-                                   Map<String, Long> thingFieldMap,
-                                   List<Map<String, Object>> csvFileList) {
-        return "";
+                                     Map<String, Object> thingMap,
+                                     Map<String, Long> thingFieldMap,
+                                     List<Map<String, Object>> csvFileList) {
+        int dbDelete = 0;
+
+        Map<String, Object> out = new HashMap<>();
+        out.put("Action", "MERGED");
+        out.put("Date", new Date());
+        out.put("Serial", thingMap.get("serial"));
+        out.put("Id", thingId);
+        out.put("IsInCsv", false);
+        out.put("IsParent", false);
+        out.put("DbRowsAffected", dbDelete);
+        out.put("CassandraRowsAffected", dbDelete);
+
+        return buildCsvRow(out);
     }
 
     private static String deleteThing(Long thingId,
-                                    Map<String, Object> thingMap,
-                                    Map<String, Long> thingFieldMap) throws SQLException {
+                                      Map<String, Object> thingMap,
+                                      Map<String, Long> thingFieldMap) throws SQLException {
 
 //        int dbDelete = DbDAO.getInstance().deleteThing(thingId, ArgsCache.database);
 
-        return "";
+        Map<String, Object> out = new HashMap<>();
+        out.put("Action", "DELETED");
+        out.put("Date", new Date());
+        out.put("Serial", thingMap.get("serial"));
+        out.put("Id", thingId);
+        out.put("IsInCsv", false);
+        out.put("IsParent", false);
+        out.put("DbRowsAffected", 0);
+        out.put("CassandraRowsAffected", 0);
 
+        return buildCsvRow(out);
+
+    }
+
+    private static String buildHeaderCsv() {
+        Map<String, Object> out = new HashMap<>();
+        for (int i = 0; i < csvHeader.length; i++) {
+            out.put(csvHeader[i], csvHeader[i]);
+        }
+        return buildCsvRow(out);
+    }
+
+    private static String buildCsvRow(Map<String, Object> out) {
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < csvHeader.length; i++) {
+            sb.append(out.get(csvHeader[i]));
+        }
+
+        return sb.toString();
     }
 
     private static boolean csvContains(String serial,
@@ -107,7 +139,8 @@ public class DuplicateFinder {
         boolean result = false;
 
         for (Map.Entry<Long, Map<String, Object>> entry : thingList.entrySet()) {
-            result = result || entry.getValue().get("serial").equals(thingEntryValue.get("serial"));
+            String serial = thingEntryValue.get("serial").toString().replace("\n", "");
+            result = result || entry.getValue().get("serial").equals(serial);
         }
 
         return result;
