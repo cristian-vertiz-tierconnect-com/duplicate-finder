@@ -1,6 +1,7 @@
 package com.mojix.dao;
 
 import com.mojix.cache.ArgsCache;
+import com.mojix.utils.TextUtils;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -30,9 +31,13 @@ public class DbDAO {
 
         java.sql.ResultSet rs = null;
         if (conn != null && database.equals("mysql")) {
-            rs = conn.createStatement().executeQuery("SELECT id, thing_id, thingTypeFieldId FROM thingfield");
+            rs = conn.createStatement().executeQuery(
+                    "SELECT id, thing_id, thingTypeFieldId " +
+                            "FROM thingfield");
         } else if (conn != null && database.equals("mssql")) {
-            rs = conn.createStatement().executeQuery("SELECT id, thing_id, thingTypeFieldId FROM dbo.thingfield");
+            rs = conn.createStatement().executeQuery(
+                    "SELECT id, thing_id, thingTypeFieldId " +
+                            "FROM dbo.thingfield");
         }
         Map<Long, Map<String, Long>> thingFieldMap2 = new HashMap<Long, Map<String, Long>>();
 
@@ -60,7 +65,7 @@ public class DbDAO {
         return thingFieldMap2;
     }
 
-    public Map<Long, Map<String, Object>> getThingList(String database)
+    public Map<Long, Map<String, Object>> getThingList(String database, String thingTypeCode)
             throws SQLException,
             IllegalAccessException,
             InstantiationException,
@@ -70,12 +75,18 @@ public class DbDAO {
         if (conn != null && database.equals("mysql")) {
             rs = conn.createStatement().executeQuery(
                     "SELECT t1.id AS id, t1.serial AS serial, t2.id AS parent_id, t2.serial AS parent_serial " +
-                            "FROM apc_thing AS t1 LEFT JOIN apc_thing AS t2 ON t1.parent_id = t2.id");
+                            "FROM apc_thing AS t1 LEFT JOIN apc_thing AS t2 ON t1.parent_id = t2.id " +
+                            "WHERE t1.thingType_id IN (SELECT id " +
+                                                    "FROM thingType " +
+                                                    "WHERE thingTypeCode IN ('" + thingTypeCode.replace(",", "','") + "'))");
 //            rs = conn.createStatement().executeQuery("SELECT id, serial, parent_id FROM apc_thing");
         } else if (conn != null && database.equals("mssql")) {
             rs = conn.createStatement().executeQuery(
-                    "SELECT t1.id id, t1.serial serial, t2.id parent_id, t2.serial parent_serial " +
-                            "FROM dbo.apc_thing t1 LEFT JOIN dbo.apc_thing t2 ON t1.parent_id = t2.id");
+                    "SELECT t1.id AS id, t1.serial AS serial, t2.id AS parent_id, t2.serial AS parent_serial " +
+                            "FROM dbo.apc_thing AS t1 LEFT JOIN apc_thing AS t2 ON t1.parent_id = t2.id " +
+                            "WHERE t1.thingType_id IN (SELECT id " +
+                                                    "FROM dbo.thingType " +
+                                                    "WHERE thingTypeCode IN ('" + thingTypeCode.replace(",", "','") + "'))");
 //            rs = conn.createStatement().executeQuery("SELECT id, serial, parent_id FROM dbo.apc_thing");
         }
 
@@ -92,9 +103,9 @@ public class DbDAO {
 
                 Map<String, Object> temp = new HashMap<String, Object>();
 
-                temp.put("serial", serial);
+                temp.put("serial", TextUtils.cleanString(serial));
                 temp.put("parentId", parentId);
-                temp.put("parentSerial", parentSerial);
+                temp.put("parentSerial", TextUtils.cleanString(parentSerial));
 
                 thingList.put(thingId, temp);
 
@@ -152,7 +163,7 @@ public class DbDAO {
     }
 
     public void closeConnection() throws SQLException {
-        if(!conn.isClosed()){
+        if (!conn.isClosed()) {
             conn.close();
         }
     }

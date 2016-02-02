@@ -1,6 +1,7 @@
 package com.mojix;
 
 import com.mojix.cache.ArgsCache;
+import com.mojix.dao.CassandraDAO;
 import com.mojix.dao.CsvDAO;
 import com.mojix.dao.DbDAO;
 import com.mojix.driver.Cassandra;
@@ -31,7 +32,7 @@ public class DuplicateFinder {
 
         //Get values from databases
         Map<Long, Map<String, Long>> thingFieldMap = DbDAO.getInstance().getThingFieldMap(ArgsCache.database);
-        Map<Long, Map<String, Object>> thingList = DbDAO.getInstance().getThingList(ArgsCache.database);
+        Map<Long, Map<String, Object>> thingList = DbDAO.getInstance().getThingList(ArgsCache.database, ArgsCache.thingTypeCode);
         List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readScv(ArgsCache.csvFile);
 
         List<String> results = new ArrayList<>();
@@ -50,11 +51,11 @@ public class DuplicateFinder {
             }
         }
 
-        saveTofile(results);
+        saveResultsTofile(results);
 
     }
 
-    private static void saveTofile(List<String> results) throws IOException {
+    private static void saveResultsTofile(List<String> results) throws IOException {
         String fileName = "results_" + (new SimpleDateFormat("YYYYMMddhhmmss").format(new Date())) + ".csv";
         File file = new File(fileName);
         BufferedWriter writer = new BufferedWriter(new FileWriter(file));
@@ -91,7 +92,8 @@ public class DuplicateFinder {
                                       Map<String, Object> thingMap,
                                       Map<String, Long> thingFieldMap) throws SQLException {
 
-//        int dbDelete = DbDAO.getInstance().deleteThing(thingId, ArgsCache.database);
+//        int dbDeleted = DbDAO.getInstance().deleteThing(thingId, ArgsCache.database);
+        int cassandraDeleted = CassandraDAO.deleteThing(thingId, new ArrayList<Long>());
 
         Map<String, Object> out = new HashMap<>();
         out.put("Action", "DELETED");
@@ -120,6 +122,9 @@ public class DuplicateFinder {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < csvHeader.length; i++) {
             sb.append(out.get(csvHeader[i]));
+            if(i < csvHeader.length-1){
+                sb.append(",");
+            }
         }
 
         return sb.toString();
@@ -173,10 +178,11 @@ public class DuplicateFinder {
         //System.out.println("");
         System.out.println("x) Exit");
         System.out.println("********************");
+        System.out.print("Type your option ");
 
     }
 
-    public static void mainMenu(String[] args) {
+    public static void mainMenu() {
         try {
             openConnections();
             String con;
@@ -185,9 +191,10 @@ public class DuplicateFinder {
                 con = Console.read();
                 switch (con) {
                     case "1":
-                        System.out.println(new Date() + " Finding duplicates...");
+                        System.out.println("Finding duplicates...");
+                        long ti = System.currentTimeMillis();
                         findDuplicates();
-                        System.out.println(new Date() + " Done finding duplicates...");
+                        System.out.println("Done finding duplicates (elapsed time "  +  ((System.currentTimeMillis()-ti)/1000) + " seconds)");
                         break;
                     case "x":
                         System.out.println("Bye!");
@@ -208,12 +215,12 @@ public class DuplicateFinder {
     }
 
     public static void main(String[] args) {
-        if (args.length < 4) {
-            System.out.print("Usage java -jar duplicate-finder.jar <DB TYPE> <DB HOST> <CASSANDRA HOST> <CSV FILE PATH>");
+        if (args.length < 5) {
+            System.out.print("Usage java -jar duplicate-finder.jar <THING TYPE CODE> <DB TYPE> <DB HOST> <CASSANDRA HOST> <CSV FILE PATH>");
             System.exit(-1);
         } else {
-            ArgsCache.setArgs(args[0], args[1], args[2], args[3]);
-            mainMenu(args);
+            ArgsCache.setArgs(args[0], args[1], args[2], args[3], args[4]);
+            mainMenu();
             System.exit(0);
         }
 

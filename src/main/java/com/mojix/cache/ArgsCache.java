@@ -11,11 +11,13 @@ public class ArgsCache {
     public static String dbHost;
     public static String cassandraHost;
     public static String csvFile;
+    public static String thingTypeCode;
 
     public ArgsCache() {
     }
 
-    public static void setArgs(String db, String host, String chost, String csv) {
+    public static void setArgs(String ttc, String db, String host, String chost, String csv) {
+        thingTypeCode = ttc;
         database = db;
         dbHost = host;
         cassandraHost = chost;

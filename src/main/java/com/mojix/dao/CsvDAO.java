@@ -1,5 +1,6 @@
 package com.mojix.dao;
 
+import com.mojix.utils.TextUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -33,8 +34,12 @@ public class CsvDAO {
 
             for(CSVRecord row : records.getRecords()){
                 Map<String, Object> rowMap = new HashMap<>();
-                rowMap.put("serial", row.get("Equipment").isEmpty()?null:row.get("Equipment"));
-                rowMap.put("parent", row.get("Serial Number"));
+
+                String serial = TextUtils.cleanString(row.get("Equipment"));
+                String parent = TextUtils.cleanString(row.get("Serial Number"));
+
+                rowMap.put("serial", serial.isEmpty()?null:serial);
+                rowMap.put("parent", parent);
                 result.add(rowMap);
             }
 
