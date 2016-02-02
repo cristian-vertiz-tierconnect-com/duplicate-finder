@@ -3,6 +3,7 @@ package com.mojix.driver;
 import com.datastax.driver.core.*;
 import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
 import com.datastax.driver.core.policies.DowngradingConsistencyRetryPolicy;
+import com.mojix.cache.ArgsCache;
 
 public class CassandraUtils {
 
@@ -13,7 +14,7 @@ public class CassandraUtils {
         return riotSession;
     }
 
-    public static void init(String hostin) {
+    public static void init() {
 
         PoolingOptions po = new PoolingOptions();
 
@@ -24,7 +25,7 @@ public class CassandraUtils {
 
         cluster = Cluster.builder().withPoolingOptions(po)
                 .withRetryPolicy(DowngradingConsistencyRetryPolicy.INSTANCE)
-                .withReconnectionPolicy(new ConstantReconnectionPolicy(2000L)).addContactPoint(hostin).build();
+                .withReconnectionPolicy(new ConstantReconnectionPolicy(2000L)).addContactPoint(ArgsCache.cassandraHost).build();
         cluster.getConfiguration().getSocketOptions().setConnectTimeoutMillis(480000);
         //cluster.getConfiguration().getPoolingOptions().setMaxConnectionsPerHost(HostDistance.LOCAL,100);
 

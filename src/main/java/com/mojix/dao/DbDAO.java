@@ -1,5 +1,7 @@
 package com.mojix.dao;
 
+import com.mojix.cache.ArgsCache;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -116,14 +118,14 @@ public class DbDAO {
 
     }
 
-    public void initMysqlJDBCDrivers(String dbHost,
-                                     String database) throws ClassNotFoundException,
+    public void initMysqlJDBCDrivers() throws ClassNotFoundException,
             SQLException,
             IllegalAccessException,
             InstantiationException {
 
-        setDBProperties(dbHost);
+        setDBProperties(ArgsCache.dbHost);
 
+        String database = ArgsCache.database;
         String url = System.getProperty("connection.url." + database);
         String userName = System.getProperty("connection.username." + database);
         String password = System.getProperty("connection.password." + database);
@@ -147,5 +149,11 @@ public class DbDAO {
         PreparedStatement statement = conn.prepareStatement(sql);
         statement.setLong(1, thingId);
         return statement.executeUpdate();
+    }
+
+    public void closeConnection() throws SQLException {
+        if(!conn.isClosed()){
+            conn.close();
+        }
     }
 }

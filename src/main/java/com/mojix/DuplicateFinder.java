@@ -1,5 +1,6 @@
 package com.mojix;
 
+import com.mojix.cache.ArgsCache;
 import com.mojix.dao.CsvDAO;
 import com.mojix.dao.DbDAO;
 import com.mojix.driver.CassandraUtils;
@@ -12,10 +13,6 @@ import java.util.List;
 public class DuplicateFinder {
 
     private static String[] car = {"|", "/", "-", "\\"};
-    private static String database;
-    private static String csvFile;
-    private static String cassandraHost;
-    private static String dbHost;
 
     public static void findDuplicates()
             throws ClassNotFoundException,
@@ -24,14 +21,10 @@ public class DuplicateFinder {
             IllegalAccessException,
             IOException {
 
-        //Init drivers
-        CassandraUtils.init(cassandraHost);
-        DbDAO.getInstance().initMysqlJDBCDrivers(dbHost, database);
-
         //Get values from databases
-        Map<Long, Map<String, Long>> thingFieldMap = DbDAO.getInstance().getThingFieldMap(database);
-        Map<Long, Map<String, Object>> thingList = DbDAO.getInstance().getThingList(database);
-        List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readScv(csvFile);
+        Map<Long, Map<String, Long>> thingFieldMap = DbDAO.getInstance().getThingFieldMap(ArgsCache.database);
+        Map<Long, Map<String, Object>> thingList = DbDAO.getInstance().getThingList(ArgsCache.database);
+        List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readScv(ArgsCache.csvFile);
 
         //Loop things from mysql/mssql
         //If thing is nor in csv file and thing has no child "delete" else "merge"
@@ -118,28 +111,73 @@ public class DuplicateFinder {
     }
 
 
-    public static void closeConnections() {
+    public static void openConnections() throws ClassNotFoundException, SQLException, InstantiationException, IllegalAccessException {
+        //Init drivers
+        CassandraUtils.init();
+        DbDAO.getInstance().initMysqlJDBCDrivers();
+    }
 
+    public static void closeConnections() {
+        try {
+            CassandraUtils.shutdown();
+            DbDAO.getInstance().closeConnection();
+        } catch (SQLException e) {
+            System.out.println("Cannot close connections");
+        }
+    }
+
+
+    public static void printMenu() {
+
+        System.out.println("********MENU********");
+        System.out.println("1) Find duplicates");
+        //System.out.println("");
+        System.out.println("x) Exit");
+        System.out.println("********************");
+
+    }
+
+    public static void mainMenu(String[] args) {
+        try {
+            openConnections();
+            String con;
+            do {
+                printMenu();
+                con = Console.read();
+                switch (con) {
+                    case "1":
+                        System.out.println("Finding duplicates...");
+                        findDuplicates();
+                        break;
+                    case "x":
+                        System.out.println("Bye!");
+                        break;
+                    default:
+                        System.out.println("Option invalid!");
+                        break;
+                }
+
+            } while (!con.equals("x"));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(-1);
+        } finally {
+            closeConnections();
+        }
     }
 
     public static void main(String[] args) {
         if (args.length < 4) {
             System.out.print("Usage java -jar duplicate-finder.jar <DB TYPE> <DB HOST> <CASSANDRA HOST> <CSV FILE PATH>");
-            System.exit(0);
-        }
-        try {
-
-            database = args[0];
-            dbHost = args[1];
-            cassandraHost = args[2];
-            csvFile = args[3];
-            findDuplicates();
-            System.exit(0);
-
-        } catch (Exception e) {
-            e.printStackTrace();
             System.exit(-1);
+        } else {
+            ArgsCache.setArgs(args[0], args[1], args[2], args[3]);
+            mainMenu(args);
+            System.exit(0);
         }
+
+
     }
 
 }
