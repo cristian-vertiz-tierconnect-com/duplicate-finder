@@ -65,7 +65,7 @@ public class DbDAO {
         return thingFieldMap2;
     }
 
-    public Map<Long, Map<String, Object>> getThingList(String database, String thingTypeCode)
+    public Map<Long, Map<String, Object>> getThingList(String database)
             throws SQLException,
             IllegalAccessException,
             InstantiationException,
@@ -75,18 +75,12 @@ public class DbDAO {
         if (conn != null && database.equals("mysql")) {
             rs = conn.createStatement().executeQuery(
                     "SELECT t1.id AS id, t1.serial AS serial, t2.id AS parent_id, t2.serial AS parent_serial " +
-                            "FROM apc_thing AS t1 LEFT JOIN apc_thing AS t2 ON t1.parent_id = t2.id " +
-                            "WHERE t1.thingType_id IN (SELECT id " +
-                                                    "FROM thingType " +
-                                                    "WHERE thingTypeCode IN ('" + thingTypeCode.replace(",", "','") + "'))");
+                            "FROM apc_thing AS t1 LEFT JOIN apc_thing AS t2 ON t1.parent_id = t2.id");
 //            rs = conn.createStatement().executeQuery("SELECT id, serial, parent_id FROM apc_thing");
         } else if (conn != null && database.equals("mssql")) {
             rs = conn.createStatement().executeQuery(
                     "SELECT t1.id AS id, t1.serial AS serial, t2.id AS parent_id, t2.serial AS parent_serial " +
-                            "FROM dbo.apc_thing AS t1 LEFT JOIN apc_thing AS t2 ON t1.parent_id = t2.id " +
-                            "WHERE t1.thingType_id IN (SELECT id " +
-                                                    "FROM dbo.thingType " +
-                                                    "WHERE thingTypeCode IN ('" + thingTypeCode.replace(",", "','") + "'))");
+                            "FROM dbo.apc_thing AS t1 LEFT JOIN dbo.apc_thing AS t2 ON t1.parent_id = t2.id");
 //            rs = conn.createStatement().executeQuery("SELECT id, serial, parent_id FROM dbo.apc_thing");
         }
 

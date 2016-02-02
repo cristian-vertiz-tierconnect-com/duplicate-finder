@@ -5,22 +5,12 @@ package com.mojix.cache;
  */
 public class ArgsCache {
 
-    ArgsCache INSTANCE = new ArgsCache();
-
     public static String database;
     public static String dbHost;
     public static String cassandraHost;
     public static String csvFile;
-    public static String thingTypeCode;
+    public static String parentThingTypeCode;
+    public static String childrenThingTypeCode;
+    public static boolean delete;
 
-    public ArgsCache() {
-    }
-
-    public static void setArgs(String ttc, String db, String host, String chost, String csv) {
-        thingTypeCode = ttc;
-        database = db;
-        dbHost = host;
-        cassandraHost = chost;
-        csvFile = csv;
-    }
 }

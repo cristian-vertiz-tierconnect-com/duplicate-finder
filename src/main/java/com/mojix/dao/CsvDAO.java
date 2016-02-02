@@ -36,10 +36,10 @@ public class CsvDAO {
                 Map<String, Object> rowMap = new HashMap<>();
 
                 String serial = TextUtils.cleanString(row.get("Equipment"));
-                String parent = TextUtils.cleanString(row.get("Serial Number"));
+                String child = TextUtils.cleanString(row.get("Serial Number"));
 
                 rowMap.put("serial", serial.isEmpty()?null:serial);
-                rowMap.put("parent", parent);
+                rowMap.put("parent", child);
                 result.add(rowMap);
             }
 

@@ -1,25 +1,27 @@
 package com.mojix;
 
+import com.datastax.driver.core.Configuration;
 import com.mojix.cache.ArgsCache;
 import com.mojix.dao.CassandraDAO;
 import com.mojix.dao.CsvDAO;
 import com.mojix.dao.DbDAO;
 import com.mojix.driver.Cassandra;
+import com.mojix.utils.ArgsParser;
 import com.mojix.utils.Console;
+import org.apache.commons.cli.CommandLine;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.sql.*;
+import java.io.*;
+import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.Date;
-import java.util.List;
 
 public class DuplicateFinder {
 
     private static String[] car = {"|", "/", "-", "\\"};
+
+    private static final String CONFIGURATION_FILE_PATH = "conf.properties";
+    private static ArgsParser argsParser;
+    private static CommandLine line;
 
     private static String[] csvHeader = {"Action", "Date", "Serial", "Id", "IsInCsv", "IsParent", "DbRowsAffected", "CassandraRowsAffected"};
 
@@ -32,7 +34,7 @@ public class DuplicateFinder {
 
         //Get values from databases
         Map<Long, Map<String, Long>> thingFieldMap = DbDAO.getInstance().getThingFieldMap(ArgsCache.database);
-        Map<Long, Map<String, Object>> thingList = DbDAO.getInstance().getThingList(ArgsCache.database, ArgsCache.thingTypeCode);
+        Map<Long, Map<String, Object>> thingList = DbDAO.getInstance().getThingList(ArgsCache.database);
         List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readScv(ArgsCache.csvFile);
 
         List<String> results = new ArrayList<>();
@@ -41,6 +43,7 @@ public class DuplicateFinder {
         //Loop things from mysql/mssql
         //If thing is nor in csv file and thing has no child "delete" else "merge"
         for (Map.Entry<Long, Map<String, Object>> thingEntry : thingList.entrySet()) {
+
             boolean contains = csvContains(thingEntry.getValue().get("serial").toString(), csvFileList);
             boolean isParent = isParent(thingEntry.getValue().get("serial").toString(), thingList);
 
@@ -55,11 +58,11 @@ public class DuplicateFinder {
             }
         }
 
-        saveResultsTofile(results);
+        saveResultsToFile(results);
 
     }
 
-    private static void saveResultsTofile(List<String> results) throws IOException {
+    private static void saveResultsToFile(List<String> results) throws IOException {
         String fileName = "results_" + (new SimpleDateFormat("YYYYMMddhhmmss").format(new Date())) + ".csv";
         File file = new File(fileName);
         BufferedWriter writer = new BufferedWriter(new FileWriter(file));
@@ -99,7 +102,7 @@ public class DuplicateFinder {
         int dbDelete = 0;
 
         Map<String, Object> out = new HashMap<>();
-        out.put("Action", "NOTHING");
+        out.put("Action", "KEEP");
         out.put("Date", new Date());
         out.put("Serial", thingMap.get("serial"));
         out.put("Id", thingId);
@@ -115,8 +118,11 @@ public class DuplicateFinder {
                                       Map<String, Object> thingMap,
                                       Map<String, Long> thingFieldMap) throws SQLException {
 
+        if (ArgsCache.delete) {
 //        int dbDeleted = DbDAO.getInstance().deleteThing(thingId, ArgsCache.database);
-        int cassandraDeleted = CassandraDAO.deleteThing(thingId, new ArrayList<Long>());
+            int cassandraDeleted = CassandraDAO.deleteThing(thingId, new ArrayList<Long>());
+
+        }
 
         Map<String, Object> out = new HashMap<>();
         out.put("Action", "DELETED");
@@ -243,14 +249,70 @@ public class DuplicateFinder {
         }
     }
 
+    public static void init(String[] args) throws ClassNotFoundException, SQLException, InstantiationException, IllegalAccessException {
+        loadDefaultConfig();
+
+
+        argsParser = new ArgsParser();
+        argsParser.addOptions();
+        line = argsParser.parseOptions(args);
+
+        if (line.hasOption("f")) {
+            ArgsCache.csvFile = line.getOptionValue("f");
+        }
+
+        if (line.hasOption("p")) {
+            ArgsCache.parentThingTypeCode = line.getOptionValue("p");
+        }
+
+        if (line.hasOption("c")) {
+            ArgsCache.childrenThingTypeCode = line.getOptionValue("c");
+        }
+
+        if (line.hasOption("d")) {
+            ArgsCache.delete = Boolean.valueOf(line.getOptionValue("d"));
+        }
+
+
+        ArgsCache.database = System.getProperty("db.engine");
+        ArgsCache.dbHost = System.getProperty("db.host");
+        ArgsCache.cassandraHost = System.getProperty("cassandra.host");
+
+        openConnections();
+    }
+
+    private static void loadDefaultConfig() {
+        Properties prop = new Properties();
+        try {
+            prop.load(new FileInputStream(CONFIGURATION_FILE_PATH));
+        } catch (Exception e) {
+            try {
+                prop.load(Configuration.class.getClassLoader().getResourceAsStream(CONFIGURATION_FILE_PATH));
+            } catch (IOException e1) {
+                throw new RuntimeException(e);
+            }
+        }
+        for (Map.Entry<Object, Object> entry : prop.entrySet()) {
+            if (entry.getValue() != null) {
+                System.getProperties().put(entry.getKey().toString(), entry.getValue().toString());
+            }
+        }
+    }
+
     public static void main(String[] args) {
-        if (args.length < 5) {
-            System.out.print("Usage java -jar duplicate-finder.jar <THING TYPE CODE> <DB TYPE> <DB HOST> <CASSANDRA HOST> <CSV FILE PATH>");
-            System.exit(-1);
-        } else {
-            ArgsCache.setArgs(args[0], args[1], args[2], args[3], args[4]);
-            mainMenu();
+
+        //mainMenu();
+        try {
+            init(args);
+
+            System.out.println("Analysing...");
+            long ti = System.currentTimeMillis();
+            findDuplicates();
+            System.out.println("Done finding duplicates (elapsed time " + ((System.currentTimeMillis() - ti) / 1000) + " seconds)");
             System.exit(0);
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
 
