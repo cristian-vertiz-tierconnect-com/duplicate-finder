@@ -42,12 +42,16 @@ public class DuplicateFinder {
         //If thing is nor in csv file and thing has no child "delete" else "merge"
         for (Map.Entry<Long, Map<String, Object>> thingEntry : thingList.entrySet()) {
             boolean contains = csvContains(thingEntry.getValue().get("serial").toString(), csvFileList);
-            boolean isParent = isParent(thingEntry.getValue(), thingList);
+            boolean isParent = isParent(thingEntry.getValue().get("serial").toString(), thingList);
 
-            if (!contains && !isParent) {
-                results.add(deleteThing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey())));
-            } else if (!contains) {
-                results.add(mergeThing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()), csvFileList));
+            if (!contains) {
+                if (isParent) {
+                    results.add(mergeThing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()), csvFileList));
+                } else {
+                    results.add(deleteThing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey())));
+                }
+            } else if (!contains && isParent) {
+                results.add(doNothing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()), csvFileList));
             }
         }
 
@@ -77,6 +81,25 @@ public class DuplicateFinder {
 
         Map<String, Object> out = new HashMap<>();
         out.put("Action", "MERGED");
+        out.put("Date", new Date());
+        out.put("Serial", thingMap.get("serial"));
+        out.put("Id", thingId);
+        out.put("IsInCsv", false);
+        out.put("IsParent", false);
+        out.put("DbRowsAffected", dbDelete);
+        out.put("CassandraRowsAffected", dbDelete);
+
+        return buildCsvRow(out);
+    }
+
+    private static String doNothing(Long thingId,
+                                    Map<String, Object> thingMap,
+                                    Map<String, Long> thingFieldMap,
+                                    List<Map<String, Object>> csvFileList) {
+        int dbDelete = 0;
+
+        Map<String, Object> out = new HashMap<>();
+        out.put("Action", "NOTHING");
         out.put("Date", new Date());
         out.put("Serial", thingMap.get("serial"));
         out.put("Id", thingId);
@@ -122,7 +145,7 @@ public class DuplicateFinder {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < csvHeader.length; i++) {
             sb.append(out.get(csvHeader[i]));
-            if(i < csvHeader.length-1){
+            if (i < csvHeader.length - 1) {
                 sb.append(",");
             }
         }
@@ -134,21 +157,27 @@ public class DuplicateFinder {
                                        List<Map<String, Object>> csvFileList) {
         boolean result = false;
         for (Map<String, Object> item : csvFileList) {
-            result = result || item.get("serial").equals(serial);
-            result = item.get("serial").equals(serial);
-            if (result) break;
+            if (item.get("serial").toString() != null) {
+                result = item.get("serial").toString().equals(serial);
+                if (result) {
+                    break;
+                }
+            }
         }
         return result;
     }
 
-    private static boolean isParent(Map<String, Object> thingEntryValue,
+    private static boolean isParent(String serial,
                                     Map<Long, Map<String, Object>> thingList) {
         boolean result = false;
 
         for (Map.Entry<Long, Map<String, Object>> entry : thingList.entrySet()) {
-            String serial = thingEntryValue.get("serial").toString().replace("\n", "");
-            result = entry.getValue().get("serial").equals(serial);
-            if (result) break;
+            if (entry.getValue().get("parentSerial") != null) {
+                result = entry.getValue().get("parentSerial").toString().equals(serial);
+                if (result) {
+                    break;
+                }
+            }
         }
 
         return result;
@@ -194,7 +223,7 @@ public class DuplicateFinder {
                         System.out.println("Finding duplicates...");
                         long ti = System.currentTimeMillis();
                         findDuplicates();
-                        System.out.println("Done finding duplicates (elapsed time "  +  ((System.currentTimeMillis()-ti)/1000) + " seconds)");
+                        System.out.println("Done finding duplicates (elapsed time " + ((System.currentTimeMillis() - ti) / 1000) + " seconds)");
                         break;
                     case "x":
                         System.out.println("Bye!");
