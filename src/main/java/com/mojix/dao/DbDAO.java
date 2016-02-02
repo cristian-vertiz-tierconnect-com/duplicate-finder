@@ -1,4 +1,4 @@
-package coderoad;
+package com.mojix.dao;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -73,7 +73,7 @@ public class DbDAO {
 //            rs = conn.createStatement().executeQuery("SELECT id, serial, parent_id FROM dbo.apc_thing");
         }
 
-        Map<Long, Map<String, Object>> thingList = new HashMap<>();
+        Map<Long, Map<String, Object>> thingList = new HashMap<Long, Map<String, Object>>();
 
         if (rs != null) {
             int counter = 0;
@@ -84,7 +84,7 @@ public class DbDAO {
                 Long parentId = rs.getLong("parent_id") == 0L? null : rs.getLong("parent_id");
                 String parentSerial = rs.getString("parent_serial");
 
-                Map<String, Object> temp = new HashMap<>();
+                Map<String, Object> temp = new HashMap<String, Object>();
 
                 temp.put("serial", serial);
                 temp.put("parentId", parentId);

@@ -1,4 +1,4 @@
-package coderoad;
+package com.mojix.driver;
 
 import com.mongodb.DB;
 import com.mongodb.DBCollection;

@@ -1,6 +1,7 @@
-package coderoad;
+package com.mojix.dao;
 
 import com.google.common.collect.Lists;
+import com.mojix.driver.MongoUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 

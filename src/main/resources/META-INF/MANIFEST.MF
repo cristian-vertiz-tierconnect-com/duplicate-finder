@@ -1,5 +1,5 @@
 Manifest-Version: 1.0
-Main-Class: coderoad.DuplicateFinder
+Main-Class: com.mojix.DuplicateFinder
 
 
 
