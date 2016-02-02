@@ -4,19 +4,16 @@ import com.datastax.driver.core.*;
 import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
 import com.datastax.driver.core.policies.DowngradingConsistencyRetryPolicy;
 
-public class CassandraUtils
-{
+public class CassandraUtils {
 
     private static Session riotSession = null;
     private static Cluster cluster = null;
 
-    public static Session getSession()
-    {
+    public static Session getSession() {
         return riotSession;
     }
 
-    public static void init( String hostin, String keyspace )
-    {
+    public static void init(String hostin) {
 
         PoolingOptions po = new PoolingOptions();
 
@@ -27,13 +24,13 @@ public class CassandraUtils
 
         cluster = Cluster.builder().withPoolingOptions(po)
                 .withRetryPolicy(DowngradingConsistencyRetryPolicy.INSTANCE)
-                .withReconnectionPolicy(new ConstantReconnectionPolicy(2000L)).addContactPoint( hostin ).build();
+                .withReconnectionPolicy(new ConstantReconnectionPolicy(2000L)).addContactPoint(hostin).build();
         cluster.getConfiguration().getSocketOptions().setConnectTimeoutMillis(480000);
         //cluster.getConfiguration().getPoolingOptions().setMaxConnectionsPerHost(HostDistance.LOCAL,100);
 
         Metadata metadata = cluster.getMetadata();
 
-        riotSession = cluster.connect( keyspace );
+        riotSession = cluster.connect("riot_main");
 
 
 //        cluster = Cluster.builder().addContactPoint( hostin ).build();
@@ -48,10 +45,8 @@ public class CassandraUtils
 //		riotSession = cluster.connect( keyspace );
     }
 
-    public static void shutdown()
-    {
-        if (cluster != null)
-        {
+    public static void shutdown() {
+        if (cluster != null) {
             cluster.close();
         }
     }
