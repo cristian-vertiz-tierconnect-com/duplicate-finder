@@ -130,6 +130,8 @@ public class DuplicateFinder {
         boolean result = false;
         for (Map<String, Object> item : csvFileList) {
             result = result || item.get("serial").equals(serial);
+            result = item.get("serial").equals(serial);
+            if (result) break;
         }
         return result;
     }
@@ -140,7 +142,8 @@ public class DuplicateFinder {
 
         for (Map.Entry<Long, Map<String, Object>> entry : thingList.entrySet()) {
             String serial = thingEntryValue.get("serial").toString().replace("\n", "");
-            result = result || entry.getValue().get("serial").equals(serial);
+            result = entry.getValue().get("serial").equals(serial);
+            if (result) break;
         }
 
         return result;
@@ -182,9 +185,9 @@ public class DuplicateFinder {
                 con = Console.read();
                 switch (con) {
                     case "1":
-                        System.out.println("Finding duplicates...");
+                        System.out.println(new Date() + " Finding duplicates...");
                         findDuplicates();
-                        System.out.println("Done finding duplicates...");
+                        System.out.println(new Date() + " Done finding duplicates...");
                         break;
                     case "x":
                         System.out.println("Bye!");
