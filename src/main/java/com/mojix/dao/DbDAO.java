@@ -2,6 +2,7 @@ package com.mojix.dao;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
@@ -58,13 +59,16 @@ public class DbDAO {
     }
 
     public Map<Long, Map<String, Object>> getThingList(String database)
-            throws SQLException, IllegalAccessException, InstantiationException, ClassNotFoundException {
+            throws SQLException,
+            IllegalAccessException,
+            InstantiationException,
+            ClassNotFoundException {
 
         java.sql.ResultSet rs = null;
         if (conn != null && database.equals("mysql")) {
             rs = conn.createStatement().executeQuery(
                     "SELECT t1.id AS id, t1.serial AS serial, t2.id AS parent_id, t2.serial AS parent_serial " +
-                    "FROM apc_thing AS t1 LEFT JOIN apc_thing AS t2 ON t1.parent_id = t2.id");
+                            "FROM apc_thing AS t1 LEFT JOIN apc_thing AS t2 ON t1.parent_id = t2.id");
 //            rs = conn.createStatement().executeQuery("SELECT id, serial, parent_id FROM apc_thing");
         } else if (conn != null && database.equals("mssql")) {
             rs = conn.createStatement().executeQuery(
@@ -81,7 +85,7 @@ public class DbDAO {
 
                 Long thingId = rs.getLong("id");
                 String serial = rs.getString("serial");
-                Long parentId = rs.getLong("parent_id") == 0L? null : rs.getLong("parent_id");
+                Long parentId = rs.getLong("parent_id") == 0L ? null : rs.getLong("parent_id");
                 String parentSerial = rs.getString("parent_serial");
 
                 Map<String, Object> temp = new HashMap<String, Object>();
@@ -112,8 +116,11 @@ public class DbDAO {
 
     }
 
-    public void initMysqlJDBCDrivers(String dbHost, String database)
-            throws ClassNotFoundException, SQLException, IllegalAccessException, InstantiationException {
+    public void initMysqlJDBCDrivers(String dbHost,
+                                     String database) throws ClassNotFoundException,
+            SQLException,
+            IllegalAccessException,
+            InstantiationException {
 
         setDBProperties(dbHost);
 
@@ -127,5 +134,18 @@ public class DbDAO {
         Class.forName(driverMysql).newInstance();
         Class.forName(driverMssql).newInstance();
         conn = DriverManager.getConnection(url, userName, password);
+    }
+
+    public int deleteThing(Long thingId,
+                           String database) throws SQLException {
+        String sql = "";
+        if (conn != null && database.equals("mysql")) {
+            sql = "DELETE FROM apc_things WHERE id=?";
+        } else if (conn != null && database.equals("mssql")) {
+            sql = "DELETE FROM dbo.apc_things WHERE id=?";
+        }
+        PreparedStatement statement = conn.prepareStatement(sql);
+        statement.setLong(1, thingId);
+        return statement.executeUpdate();
     }
 }

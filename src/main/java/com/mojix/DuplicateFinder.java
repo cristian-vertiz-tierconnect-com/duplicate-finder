@@ -17,7 +17,12 @@ public class DuplicateFinder {
     private static String cassandraHost;
     private static String dbHost;
 
-    public static void findDuplicates() throws ClassNotFoundException, SQLException, InstantiationException, IllegalAccessException, IOException {
+    public static void findDuplicates()
+            throws ClassNotFoundException,
+            SQLException,
+            InstantiationException,
+            IllegalAccessException,
+            IOException {
 
         //Init drivers
         CassandraUtils.init(cassandraHost);
@@ -29,12 +34,15 @@ public class DuplicateFinder {
         List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readScv(csvFile);
 
         //Loop things from mysql/mssql
+        //If thing is nor in csv file and thing has no child "delete" else "merge"
         for (Map.Entry<Long, Map<String, Object>> thingEntry : thingList.entrySet()) {
-            if (!csvContains(thingEntry.getValue().get("serial").toString(), csvFileList) &&
-                    thingEntry.getValue().get("parent_id") == null) {
-                deleteThing(thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()));
-            } else {
-                mergeThing(thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()), csvFileList);
+            boolean contains = csvContains(thingEntry.getValue().get("serial").toString(), csvFileList);
+            boolean isParent = isParent(thingEntry.getValue(), thingList);
+
+            if (!contains && !isParent) {
+                deleteThing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()));
+            } else if (!contains) {
+                mergeThing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()), csvFileList);
             }
         }
 
@@ -74,21 +82,41 @@ public class DuplicateFinder {
 
     }
 
-    private static void mergeThing(Map<String, Object> value, Map<String, Long> thingFieldMap, List<Map<String, Object>> csvFileList) {
+    private static void mergeThing(Long thingId,
+                                   Map<String, Object> value,
+                                   Map<String, Long> thingFieldMap,
+                                   List<Map<String, Object>> csvFileList) {
 
     }
 
-    private static void deleteThing(Map<String, Object> thingMap, Map<String, Long> thingFieldMap) {
+    private static void deleteThing(Long thingId,
+                                    Map<String, Object> thingMap,
+                                    Map<String, Long> thingFieldMap) throws SQLException {
+
+        //int dbDelete = DbDAO.getInstance().deleteThing(thingId, database);
 
     }
 
-    private static boolean csvContains(String serial, List<Map<String, Object>> csvFileList) {
+    private static boolean csvContains(String serial,
+                                       List<Map<String, Object>> csvFileList) {
         boolean result = false;
         for (Map<String, Object> item : csvFileList) {
             result = result || item.get("serial").equals(serial);
         }
         return result;
     }
+
+    private static boolean isParent(Map<String, Object> thingEntryValue,
+                                    Map<Long, Map<String, Object>> thingList) {
+        boolean result = false;
+
+        for (Map.Entry<Long, Map<String, Object>> entry : thingList.entrySet()) {
+            result = result || entry.getValue().get("serial").equals(thingEntryValue.get("serial"));
+        }
+
+        return result;
+    }
+
 
     public static void closeConnections() {
 
