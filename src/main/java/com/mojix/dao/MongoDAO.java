@@ -1,7 +1,7 @@
 package com.mojix.dao;
 
 import com.google.common.collect.Lists;
-import com.mojix.driver.MongoUtils;
+import com.mojix.driver.Mongo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 
@@ -34,7 +34,7 @@ public class MongoDAO {
         groupPileline.add(group);
 
 
-        return Lists.newArrayList(MongoUtils.thingSnapshotIdsCollection.aggregate(
+        return Lists.newArrayList(Mongo.thingSnapshotIdsCollection.aggregate(
                 groupPileline
         ).results());
 

@@ -5,7 +5,7 @@ import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
 import com.datastax.driver.core.policies.DowngradingConsistencyRetryPolicy;
 import com.mojix.cache.ArgsCache;
 
-public class CassandraUtils {
+public class Cassandra {
 
     private static Session riotSession = null;
     private static Cluster cluster = null;

@@ -3,7 +3,8 @@ package com.mojix;
 import com.mojix.cache.ArgsCache;
 import com.mojix.dao.CsvDAO;
 import com.mojix.dao.DbDAO;
-import com.mojix.driver.CassandraUtils;
+import com.mojix.driver.Cassandra;
+import com.mojix.utils.Console;
 
 import java.io.IOException;
 import java.sql.*;
@@ -75,18 +76,20 @@ public class DuplicateFinder {
 
     }
 
-    private static void mergeThing(Long thingId,
+    private static String mergeThing(Long thingId,
                                    Map<String, Object> value,
                                    Map<String, Long> thingFieldMap,
                                    List<Map<String, Object>> csvFileList) {
-
+        return "";
     }
 
-    private static void deleteThing(Long thingId,
+    private static String deleteThing(Long thingId,
                                     Map<String, Object> thingMap,
                                     Map<String, Long> thingFieldMap) throws SQLException {
 
-        //int dbDelete = DbDAO.getInstance().deleteThing(thingId, database);
+//        int dbDelete = DbDAO.getInstance().deleteThing(thingId, ArgsCache.database);
+
+        return "";
 
     }
 
@@ -113,13 +116,13 @@ public class DuplicateFinder {
 
     public static void openConnections() throws ClassNotFoundException, SQLException, InstantiationException, IllegalAccessException {
         //Init drivers
-        CassandraUtils.init();
+        Cassandra.init();
         DbDAO.getInstance().initMysqlJDBCDrivers();
     }
 
     public static void closeConnections() {
         try {
-            CassandraUtils.shutdown();
+            Cassandra.shutdown();
             DbDAO.getInstance().closeConnection();
         } catch (SQLException e) {
             System.out.println("Cannot close connections");
@@ -148,6 +151,7 @@ public class DuplicateFinder {
                     case "1":
                         System.out.println("Finding duplicates...");
                         findDuplicates();
+                        System.out.println("Done finding duplicates...");
                         break;
                     case "x":
                         System.out.println("Bye!");

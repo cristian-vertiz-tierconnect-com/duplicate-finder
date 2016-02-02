@@ -1,4 +1,4 @@
-package com.mojix;
+package com.mojix.utils;
 
 import java.io.BufferedReader;
 import java.io.IOException;

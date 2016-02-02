@@ -8,8 +8,8 @@ import com.mongodb.MongoClientOptions;
 
 import java.net.UnknownHostException;
 
-public class MongoUtils {
-    private static MongoUtils instance = new MongoUtils();
+public class Mongo {
+    private static Mongo instance = new Mongo();
 
     public static MongoClient mongoClient;
     public static DB db;
@@ -23,12 +23,12 @@ public class MongoUtils {
 
     private static boolean enabled = true;
 
-    public MongoUtils() {
+    public Mongo() {
     }
 
-    public static MongoUtils getInstance() {
+    public static Mongo getInstance() {
         if (instance == null)
-            instance = new MongoUtils();
+            instance = new Mongo();
         return instance;
     }
 
@@ -45,7 +45,7 @@ public class MongoUtils {
         // mongoClient.setWriteConcern(WriteConcern.JOURNALED);
         //mongoClient.setWriteConcern( WriteConcern.UNACKNOWLEDGED );
 
-        MongoUtils.setEnabled(true);
+        Mongo.setEnabled(true);
 
 
         thingsCollection = db.getCollection("things");
