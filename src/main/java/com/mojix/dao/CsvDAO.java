@@ -25,7 +25,7 @@ public class CsvDAO {
         return INSTANCE;
     }
 
-    public List<Map<String, Object>> readScv(String filePath) {
+    public List<Map<String, Object>> readCsv(String filePath) {
         List<Map<String, Object>> result = new ArrayList<>();
 
         try {

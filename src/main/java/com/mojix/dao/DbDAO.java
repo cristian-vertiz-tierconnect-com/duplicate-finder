@@ -7,7 +7,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -26,7 +28,7 @@ public class DbDAO {
     }
 
 
-    public Map<Long, Map<String, Long>> getThingFieldMap(String database)
+    public Map<Long, List<Long>> getThingFieldMap(String database)
             throws SQLException, IllegalAccessException, InstantiationException, ClassNotFoundException {
 
         java.sql.ResultSet rs = null;
@@ -39,78 +41,221 @@ public class DbDAO {
                     "SELECT id, thing_id, thingTypeFieldId " +
                             "FROM dbo.thingfield");
         }
-        Map<Long, Map<String, Long>> thingFieldMap2 = new HashMap<Long, Map<String, Long>>();
-
+        Map<Long, List<Long>> thingFieldMap = new HashMap<>();
+        long countTF = 0;
         if (rs != null) {
-            int counter = 0;
             while (rs.next()) {
 
-                Long thingTypeFieldId = rs.getLong("thingTypeFieldId");
                 Long thingId = rs.getLong("thing_id");
                 Long thingFieldId = rs.getLong("id");
 
-                Map<String, Long> data = new HashMap<String, Long>();
+                if (!thingFieldMap.containsKey(thingId)) {
+                    thingFieldMap.put(thingId, new ArrayList<Long>());
+                }
 
-                data.put("thingId", thingId);
-                data.put("thingTypeFieldId", thingTypeFieldId);
+                thingFieldMap.get(thingId).add(thingFieldId);
 
-                thingFieldMap2.put(thingFieldId, data);
-                counter++;
+                countTF++;
+                if (countTF % TextUtils.MOD == 0) {
+                    System.out.print("\rGetting " + ArgsCache.database + " thingField values " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                }
+
             }
         } else {
             System.out.println("No connection available for " + System.getProperty("connection.url." + database));
         }
 
+        System.out.println("\rGetting " + ArgsCache.database + " thingField values [OK]");
 
-        return thingFieldMap2;
+        return thingFieldMap;
     }
 
-    public Map<Long, Map<String, Object>> getThingList(String database)
+
+    public Map<Long, Map<Long, Long>> getThingFieldToThingTypeFieldMap(String database)
+            throws SQLException, IllegalAccessException, InstantiationException, ClassNotFoundException {
+
+        java.sql.ResultSet rs = null;
+        if (conn != null && database.equals("mysql")) {
+            rs = conn.createStatement().executeQuery(
+                    "SELECT id, thing_id, thingTypeFieldId " +
+                            "FROM thingfield");
+        } else if (conn != null && database.equals("mssql")) {
+            rs = conn.createStatement().executeQuery(
+                    "SELECT id, thing_id, thingTypeFieldId " +
+                            "FROM dbo.thingfield");
+        }
+        Map<Long, Map<Long, Long>> thingFieldMap = new HashMap<>();
+        long countTF = 0;
+        if (rs != null) {
+            while (rs.next()) {
+
+                Long thingId = rs.getLong("thing_id");
+                Long thingFieldId = rs.getLong("id");
+                Long thingTypeFieldId = rs.getLong("thingTypeFieldId");
+
+                if (!thingFieldMap.containsKey(thingId)) {
+                    thingFieldMap.put(thingId, new HashMap<Long, Long>());
+                }
+
+                thingFieldMap.get(thingId).put(thingFieldId, thingTypeFieldId);
+
+                countTF++;
+                if (countTF % TextUtils.MOD == 0) {
+                    System.out.print("\rGetting " + ArgsCache.database + " thingField values " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                }
+
+            }
+        } else {
+            System.out.println("No connection available for " + System.getProperty("connection.url." + database));
+        }
+
+        System.out.println("\rGetting " + ArgsCache.database + " thingField values [OK]");
+
+        return thingFieldMap;
+    }
+
+    public Map<Long, Map<Long, Long>> getThingTypeFieldToThingFieldMap(String database)
+            throws SQLException, IllegalAccessException, InstantiationException, ClassNotFoundException {
+
+        java.sql.ResultSet rs = null;
+        if (conn != null && database.equals("mysql")) {
+            rs = conn.createStatement().executeQuery(
+                    "SELECT id, thing_id, thingTypeFieldId " +
+                            "FROM thingfield");
+        } else if (conn != null && database.equals("mssql")) {
+            rs = conn.createStatement().executeQuery(
+                    "SELECT id, thing_id, thingTypeFieldId " +
+                            "FROM dbo.thingfield");
+        }
+        Map<Long, Map<Long, Long>> thingFieldMap = new HashMap<>();
+        long countTF = 0;
+        if (rs != null) {
+            while (rs.next()) {
+
+                Long thingId = rs.getLong("thing_id");
+                Long thingFieldId = rs.getLong("id");
+                Long thingTypeFieldId = rs.getLong("thingTypeFieldId");
+
+                if (!thingFieldMap.containsKey(thingTypeFieldId)) {
+                    thingFieldMap.put(thingTypeFieldId, new HashMap<Long, Long>());
+                }
+
+                thingFieldMap.get(thingTypeFieldId).put(thingId, thingFieldId);
+
+                countTF++;
+                if (countTF % TextUtils.MOD == 0) {
+                    System.out.print("\rGetting " + ArgsCache.database + " thingField values " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                }
+
+            }
+        } else {
+            System.out.println("No connection available for " + System.getProperty("connection.url." + database));
+        }
+
+        System.out.println("\rGetting " + ArgsCache.database + " thingField values [OK]");
+
+        return thingFieldMap;
+    }
+
+    public Map<Long, Long> getThingFieldThingMap(String database)
+            throws SQLException, IllegalAccessException, InstantiationException, ClassNotFoundException {
+
+        java.sql.ResultSet rs = null;
+        if (conn != null && database.equals("mysql")) {
+            rs = conn.createStatement().executeQuery(
+                    "SELECT id, thing_id, thingTypeFieldId " +
+                            "FROM thingfield");
+        } else if (conn != null && database.equals("mssql")) {
+            rs = conn.createStatement().executeQuery(
+                    "SELECT id, thing_id, thingTypeFieldId " +
+                            "FROM dbo.thingfield");
+        }
+        Map<Long, Long> thingFieldMap = new HashMap<>();
+        long countTF = 0;
+        if (rs != null) {
+            while (rs.next()) {
+
+                Long thingId = rs.getLong("thing_id");
+                Long thingFieldId = rs.getLong("id");
+
+                thingFieldMap.put(thingFieldId, thingId);
+                countTF++;
+                if (countTF % TextUtils.MOD == 0) {
+                    System.out.print("\rGetting " + ArgsCache.database + " thingField to thing map " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                }
+            }
+        } else {
+            System.out.println("No connection available for " + System.getProperty("connection.url." + database));
+        }
+
+        System.out.println("\rGetting " + ArgsCache.database + " thingField to thing map [OK]");
+        return thingFieldMap;
+    }
+
+
+    public Map<String, List<Map<String, Object>>> getThingList(String database)
             throws SQLException,
             IllegalAccessException,
             InstantiationException,
             ClassNotFoundException {
 
         java.sql.ResultSet rs = null;
+
+        String query = "SELECT t1.id AS id, " +
+                "t1.serial AS serial, " +
+                "t1.thingTypeCode AS thingTypeCode, " +
+                "t2.id AS parent_id, " +
+                "t2.serial AS parent_serial, " +
+                "t2.thingTypeCode AS parentThingTypeCode " +
+                "FROM " +
+                "(SELECT t.*, tt.thingTypeCode FROM <SCHEMA>apc_thing AS t, thingtype as tt WHERE t.thingType_id = tt.id) AS t1 " +
+                "LEFT JOIN " +
+                "(SELECT t.*, tt.thingTypeCode FROM <SCHEMA>apc_thing AS t, thingtype as tt WHERE t.thingType_id = tt.id) AS t2 " +
+                "ON t1.parent_id = t2.id";
+
         if (conn != null && database.equals("mysql")) {
-            rs = conn.createStatement().executeQuery(
-                    "SELECT t1.id AS id, t1.serial AS serial, t2.id AS parent_id, t2.serial AS parent_serial " +
-                            "FROM apc_thing AS t1 LEFT JOIN apc_thing AS t2 ON t1.parent_id = t2.id");
-//            rs = conn.createStatement().executeQuery("SELECT id, serial, parent_id FROM apc_thing");
+            query = query.replaceAll("<SCHEMA>", "");
         } else if (conn != null && database.equals("mssql")) {
-            rs = conn.createStatement().executeQuery(
-                    "SELECT t1.id AS id, t1.serial AS serial, t2.id AS parent_id, t2.serial AS parent_serial " +
-                            "FROM dbo.apc_thing AS t1 LEFT JOIN dbo.apc_thing AS t2 ON t1.parent_id = t2.id");
-//            rs = conn.createStatement().executeQuery("SELECT id, serial, parent_id FROM dbo.apc_thing");
+            query = query.replaceAll("<SCHEMA>", "dbo.");
         }
+        rs = conn.createStatement().executeQuery(query);
 
-        Map<Long, Map<String, Object>> thingList = new HashMap<Long, Map<String, Object>>();
-
+        Map<String, List<Map<String, Object>>> thingMap = new HashMap<>();
+        long countTF = 0;
         if (rs != null) {
-            int counter = 0;
+
             while (rs.next()) {
 
                 Long thingId = rs.getLong("id");
                 String serial = rs.getString("serial");
+                String thingType = rs.getString("thingTypeCode");
                 Long parentId = rs.getLong("parent_id") == 0L ? null : rs.getLong("parent_id");
                 String parentSerial = rs.getString("parent_serial");
+                String parentThingType = rs.getString("parentThingTypeCode");
 
                 Map<String, Object> temp = new HashMap<String, Object>();
 
+                temp.put("id", thingId);
                 temp.put("serial", TextUtils.cleanString(serial));
                 temp.put("parentId", parentId);
                 temp.put("parentSerial", TextUtils.cleanString(parentSerial));
 
-                thingList.put(thingId, temp);
+                if (!thingMap.containsKey(thingType)) {
+                    thingMap.put(thingType, new ArrayList<Map<String, Object>>());
+                }
+                thingMap.get(thingType).add(temp);
 
-                counter++;
-
+                countTF++;
+                if (countTF % TextUtils.MOD == 0) {
+                    System.out.print("\rGetting " + ArgsCache.database + " thing values " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                }
             }
         } else {
             System.out.println("No connection available for " + System.getProperty("connection.url." + database));
         }
 
-        return thingList;
+        System.out.println("\rGetting " + ArgsCache.database + " thing values [OK]");
+        return thingMap;
     }
 
     public void setDBProperties(String dbHost) {
@@ -143,17 +288,22 @@ public class DbDAO {
         conn = DriverManager.getConnection(url, userName, password);
     }
 
-    public int deleteThing(Long thingId,
+    public void deleteThing(Long thingId,
                            String database) throws SQLException {
-        String sql = "";
+        String sqlT = "DELETE FROM dbo.apc_thing WHERE id=?";
+        String sqlTf = "DELETE FROM thingField WHERE thing_id=?";
         if (conn != null && database.equals("mysql")) {
-            sql = "DELETE FROM apc_things WHERE id=?";
+            sqlT = sqlT.replaceAll("dbo.","");
         } else if (conn != null && database.equals("mssql")) {
-            sql = "DELETE FROM dbo.apc_things WHERE id=?";
+
         }
-        PreparedStatement statement = conn.prepareStatement(sql);
-        statement.setLong(1, thingId);
-        return statement.executeUpdate();
+        PreparedStatement statementTf = conn.prepareStatement(sqlTf);
+        statementTf.setLong(1, thingId);
+        statementTf.executeUpdate();
+
+        PreparedStatement statementT = conn.prepareStatement(sqlT);
+        statementT.setLong(1, thingId);
+        statementT.executeUpdate();
     }
 
     public void closeConnection() throws SQLException {

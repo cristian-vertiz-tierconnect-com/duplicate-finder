@@ -8,6 +8,7 @@ import com.mojix.dao.DbDAO;
 import com.mojix.driver.Cassandra;
 import com.mojix.utils.ArgsParser;
 import com.mojix.utils.Console;
+import com.mojix.utils.TextUtils;
 import org.apache.commons.cli.CommandLine;
 
 import java.io.*;
@@ -17,13 +18,16 @@ import java.util.*;
 
 public class DuplicateFinder {
 
-    private static String[] car = {"|", "/", "-", "\\"};
+
 
     private static final String CONFIGURATION_FILE_PATH = "conf.properties";
     private static ArgsParser argsParser;
     private static CommandLine line;
 
-    private static String[] csvHeader = {"Action", "Date", "Serial", "Id", "IsInCsv", "IsParent", "DbRowsAffected", "CassandraRowsAffected"};
+    private static String[] csvHeader = {"Action", "Date", "Serial", "Id", "IsInCsv", "IsParent", "DuplicateId", "DuplicateSerial", "DuplicateIsParent"};
+
+
+    private static List<Long> donotProcessList = new ArrayList<>();
 
     public static void findDuplicates()
             throws ClassNotFoundException,
@@ -33,33 +37,217 @@ public class DuplicateFinder {
             IOException {
 
         //Get values from databases
-        Map<Long, Map<String, Long>> thingFieldMap = DbDAO.getInstance().getThingFieldMap(ArgsCache.database);
-        Map<Long, Map<String, Object>> thingList = DbDAO.getInstance().getThingList(ArgsCache.database);
-        List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readScv(ArgsCache.csvFile);
+        Map<Long, List<Long>> thingFieldMap = DbDAO.getInstance().getThingFieldMap(ArgsCache.database);
+        Map<Long, List<Long>> thingFieldToThingTypeFieldMap = DbDAO.getInstance().getThingFieldMap(ArgsCache.database);
+        Map<Long, List<Long>> thingTypeFieldToThingFieldMap = DbDAO.getInstance().getThingFieldMap(ArgsCache.database);
+        Map<Long, Long> thingFieldThingMap = DbDAO.getInstance().getThingFieldThingMap(ArgsCache.database);
+        Map<String, List<Map<String, Object>>> thingMap = DbDAO.getInstance().getThingList(ArgsCache.database);
+        List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readCsv(ArgsCache.csvFile);
+        Map<Long, Map<String, Object>> fieldValue = CassandraDAO.getInstance().getLastValues(thingFieldThingMap);
+        Map<Long, List<Map<String, Object>>> fieldValueHistory = CassandraDAO.getInstance().getHistory(thingFieldThingMap);
 
         List<String> results = new ArrayList<>();
         results.add(buildHeaderCsv());
 
         //Loop things from mysql/mssql
         //If thing is nor in csv file and thing has no child "delete" else "merge"
-        for (Map.Entry<Long, Map<String, Object>> thingEntry : thingList.entrySet()) {
+        long countT = 0;
+        for (Map<String, Object> thing : thingMap.get(ArgsCache.parentThingTypeCode)) {
 
-            boolean contains = csvContains(thingEntry.getValue().get("serial").toString(), csvFileList);
-            boolean isParent = isParent(thingEntry.getValue().get("serial").toString(), thingList);
+            if (!donotProcessList.contains(Long.parseLong(thing.get("id").toString()))) {
+                boolean contains = csvContains(thing.get("serial").toString(), csvFileList);
+                boolean isParent = isParent(thing.get("serial").toString(), thingMap.get(ArgsCache.childrenThingTypeCode));
+                Map<String, Object> duplicate = getDuplicate(thing.get("serial").toString(),
+                        (long) thing.get("id"), thingMap.get(ArgsCache.parentThingTypeCode));
 
-            if (!contains) {
-                if (isParent) {
-                    results.add(mergeThing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()), csvFileList));
+                if (!contains) {
+                    if (isParent) {
+                        if (duplicate != null) {
+                            results.add(mergeThing(thing,
+                                    thingFieldMap.get(Long.parseLong(thing.get("id").toString())),
+                                    fieldValue.get(Long.parseLong(thing.get("id").toString())),
+                                    fieldValueHistory.get(Long.parseLong(thing.get("id").toString())),
+                                    duplicate,
+                                    thingFieldMap.get(Long.parseLong(duplicate.get("id").toString())),
+                                    fieldValue.get(Long.parseLong(duplicate.get("id").toString())),
+                                    fieldValueHistory.get(Long.parseLong(duplicate.get("id").toString())),
+                                    thingMap.get(ArgsCache.childrenThingTypeCode),
+                                    isParent, contains));
+                        } else {
+                            results.add(doNothing(thing));
+                        }
+                    } else {
+                        results.add(deleteThing(thing,
+                                thingFieldMap.get(Long.parseLong(thing.get("id").toString()))));
+                    }
+                } else if (duplicate != null) {
+                    results.add(mergeThing(thing,
+                            thingFieldMap.get(Long.parseLong(thing.get("id").toString())),
+                            fieldValue.get(Long.parseLong(thing.get("id").toString())),
+                            fieldValueHistory.get(Long.parseLong(thing.get("id").toString())),
+                            duplicate,
+                            thingFieldMap.get(Long.parseLong(duplicate.get("id").toString())),
+                            fieldValue.get(Long.parseLong(duplicate.get("id").toString())),
+                            fieldValueHistory.get(Long.parseLong(duplicate.get("id").toString())),
+                            thingMap.get(ArgsCache.childrenThingTypeCode),
+                            isParent, contains));
                 } else {
-                    results.add(deleteThing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey())));
+                    results.add(doNothing(thing));
                 }
-            } else if (!contains && isParent) {
-                results.add(doNothing(thingEntry.getKey(), thingEntry.getValue(), thingFieldMap.get(thingEntry.getKey()), csvFileList));
+            }
+            countT++;
+            if (countT % (TextUtils.MOD / 1000) == 0) {
+                System.out.print("\rAnalysing duplicated values " + TextUtils.CAR[(int) (countT / TextUtils.MOD / 1000) % 4]);
             }
         }
-
+        System.out.println("\rAnalysing duplicated values [OK]");
         saveResultsToFile(results);
 
+    }
+
+    private static String mergeThing(Map<String, Object> thing,
+                                     List<Long> thingFieldList,
+                                     Map<String, Object> fieldValue,
+                                     List<Map<String, Object>> fieldValueHistory,
+                                     Map<String, Object> duplicate,
+                                     List<Long> duplicateThingFieldList,
+                                     Map<String, Object> duplicateFieldValue,
+                                     List<Map<String, Object>> duplicateFieldValueHistory,
+                                     List<Map<String, Object>> thingMap,
+                                     boolean isParent, boolean isinCsv) throws SQLException {
+
+
+        boolean duplicateIsParent = isParent(duplicate.get("serial").toString(), thingMap);
+
+        String action = "FOR MERGING";
+        String serial = "";
+        String id = "";
+        String duplicateSerial = "";
+        String duplicateId = "";
+
+        //if (ArgsCache.delete) {
+        if (isParent) {
+            if (ArgsCache.delete)
+                mergeThingData(thing, thingFieldList, fieldValue, fieldValueHistory, duplicate, duplicateThingFieldList,
+                        duplicateFieldValue, duplicateFieldValueHistory);
+
+            id = thing.get("id").toString();
+            serial = thing.get("serial").toString();
+            duplicateId = duplicate.get("id").toString();
+            duplicateSerial = duplicate.get("serial").toString();
+
+            if (ArgsCache.delete) {
+                deleteThing(duplicate, duplicateThingFieldList);
+                action = "MERGED1";
+            }
+
+        } else {
+            if (duplicateIsParent) {
+                mergeThingData(duplicate, duplicateThingFieldList,
+                        duplicateFieldValue, duplicateFieldValueHistory,
+                        thing, thingFieldList, fieldValue, fieldValueHistory);
+
+                isParent = true;
+                duplicateIsParent = false;
+
+                id = duplicate.get("id").toString();
+                serial = duplicate.get("serial").toString();
+                duplicateId = thing.get("id").toString();
+                duplicateSerial = thing.get("serial").toString();
+
+                if (ArgsCache.delete) {
+                    deleteThing(thing, thingFieldList);
+                    action = "MERGED2";
+                }
+            } else {
+
+                id = thing.get("id").toString();
+                serial = thing.get("serial").toString();
+                duplicateId = duplicate.get("id").toString();
+                duplicateSerial = duplicate.get("serial").toString();
+
+                if (ArgsCache.delete) {
+                    deleteThing(thing, thingFieldList);
+                    deleteThing(duplicate, duplicateThingFieldList);
+                    action = "DELETED2";
+                }
+            }
+            }
+        //}
+
+        donotProcessList.add(Long.parseLong(thing.get("id").toString()));
+        donotProcessList.add(Long.parseLong(duplicate.get("id").toString()));
+
+
+        return buildCsvRow(getLineMap(action, serial, id, isParent, isinCsv, duplicateId, duplicateSerial, duplicateIsParent));
+    }
+
+    public static Map<String, Object> getLineMap(String action,
+                                                 String serial,
+                                                 String id,
+                                                 boolean isParent,
+                                                 boolean isInCsv,
+                                                 String duplicateId,
+                                                 String duplicateSerial,
+                                                 boolean duplicateIsParent) {
+        Map<String, Object> out = new HashMap<>();
+        out.put("Action", action);
+        out.put("Date", new Date());
+        out.put("Serial", serial);
+        out.put("Id", id);
+        out.put("IsInCsv", isInCsv);
+        out.put("IsParent", isParent);
+        out.put("DuplicateId", duplicateId == null ? "" : duplicateId);
+        out.put("DuplicateSerial", duplicateSerial == null ? "" : duplicateSerial);
+        out.put("DuplicateIsParent", duplicateIsParent);
+        return out;
+    }
+
+    private static void mergeThingData(Map<String, Object> thing, List<Long> thingFieldList, Map<String, Object> fieldValue, List<Map<String, Object>> fieldValueHistory, Map<String, Object> duplicate, List<Long> duplicatethingFieldList, Map<String, Object> duplicateFieldValue, List<Map<String, Object>> duplicateFieldValueHistory) {
+
+
+    }
+
+    private static String deleteThing(Map<String, Object> thingMap,
+                                      List<Long> thingFieldList) throws SQLException {
+
+        String action = "FOR DELETION";
+
+        if (ArgsCache.delete) {
+
+            DbDAO.getInstance().deleteThing((long) thingMap.get("id"), ArgsCache.database);
+            CassandraDAO.getInstance().deleteThing(thingFieldList);
+            action = "DELETED1";
+        }
+
+//        Map<String, Object> out = new HashMap<>();
+//        out.put("Action", action);
+//        out.put("Date", new Date());
+//        out.put("Serial", thingMap.get("serial"));
+//        out.put("Id", thingMap.get("id"));
+//        out.put("IsInCsv", false);
+//        out.put("IsParent", false);
+
+        return buildCsvRow(getLineMap(action,
+                thingMap.get("serial").toString(),
+                thingMap.get("id").toString(), false, false, "", "", false));
+
+    }
+
+    private static String doNothing(Map<String, Object> thingMap) {
+
+        String action = "KEEP(NO ACTION)";
+
+        Map<String, Object> out = new HashMap<>();
+        out.put("Action", action);
+        out.put("Date", new Date());
+        out.put("Serial", thingMap.get("serial"));
+        out.put("Id", thingMap.get("id"));
+        out.put("IsInCsv", false);
+        out.put("IsParent", false);
+
+
+        return buildCsvRow(out);
     }
 
     private static void saveResultsToFile(List<String> results) throws IOException {
@@ -74,68 +262,6 @@ public class DuplicateFinder {
             if (writer != null) writer.close();
             System.out.println("*** Results have been written to csv file  " + fileName);
         }
-    }
-
-    private static String mergeThing(Long thingId,
-                                     Map<String, Object> thingMap,
-                                     Map<String, Long> thingFieldMap,
-                                     List<Map<String, Object>> csvFileList) {
-        int dbDelete = 0;
-
-        Map<String, Object> out = new HashMap<>();
-        out.put("Action", "MERGED");
-        out.put("Date", new Date());
-        out.put("Serial", thingMap.get("serial"));
-        out.put("Id", thingId);
-        out.put("IsInCsv", false);
-        out.put("IsParent", false);
-        out.put("DbRowsAffected", dbDelete);
-        out.put("CassandraRowsAffected", dbDelete);
-
-        return buildCsvRow(out);
-    }
-
-    private static String doNothing(Long thingId,
-                                    Map<String, Object> thingMap,
-                                    Map<String, Long> thingFieldMap,
-                                    List<Map<String, Object>> csvFileList) {
-        int dbDelete = 0;
-
-        Map<String, Object> out = new HashMap<>();
-        out.put("Action", "KEEP");
-        out.put("Date", new Date());
-        out.put("Serial", thingMap.get("serial"));
-        out.put("Id", thingId);
-        out.put("IsInCsv", false);
-        out.put("IsParent", false);
-        out.put("DbRowsAffected", dbDelete);
-        out.put("CassandraRowsAffected", dbDelete);
-
-        return buildCsvRow(out);
-    }
-
-    private static String deleteThing(Long thingId,
-                                      Map<String, Object> thingMap,
-                                      Map<String, Long> thingFieldMap) throws SQLException {
-
-        if (ArgsCache.delete) {
-//        int dbDeleted = DbDAO.getInstance().deleteThing(thingId, ArgsCache.database);
-            int cassandraDeleted = CassandraDAO.deleteThing(thingId, new ArrayList<Long>());
-
-        }
-
-        Map<String, Object> out = new HashMap<>();
-        out.put("Action", "DELETED");
-        out.put("Date", new Date());
-        out.put("Serial", thingMap.get("serial"));
-        out.put("Id", thingId);
-        out.put("IsInCsv", false);
-        out.put("IsParent", false);
-        out.put("DbRowsAffected", 0);
-        out.put("CassandraRowsAffected", 0);
-
-        return buildCsvRow(out);
-
     }
 
     private static String buildHeaderCsv() {
@@ -174,12 +300,12 @@ public class DuplicateFinder {
     }
 
     private static boolean isParent(String serial,
-                                    Map<Long, Map<String, Object>> thingList) {
+                                    List<Map<String, Object>> thingList) {
         boolean result = false;
 
-        for (Map.Entry<Long, Map<String, Object>> entry : thingList.entrySet()) {
-            if (entry.getValue().get("parentSerial") != null) {
-                result = entry.getValue().get("parentSerial").toString().equals(serial);
+        for (Map<String, Object> thing : thingList) {
+            if (thing.get("parentSerial") != null) {
+                result = thing.get("parentSerial").toString().equals(serial);
                 if (result) {
                     break;
                 }
@@ -187,6 +313,19 @@ public class DuplicateFinder {
         }
 
         return result;
+    }
+
+    private static Map<String, Object> getDuplicate(String serial, Long thingId, List<Map<String, Object>> thingList) {
+
+        for (Map<String, Object> thing : thingList) {
+            if (thing.get("serial").toString().equalsIgnoreCase(serial) &&
+                    thingId != Long.parseLong(thing.get("id").toString())) {
+                System.out.println(serial + "|" + thingId + " = " + thing.get("serial") + "|" + thing.get("id"));
+                return thing;
+            }
+
+        }
+        return null;
     }
 
 
@@ -269,10 +408,7 @@ public class DuplicateFinder {
             ArgsCache.childrenThingTypeCode = line.getOptionValue("c");
         }
 
-        if (line.hasOption("d")) {
-            ArgsCache.delete = Boolean.valueOf(line.getOptionValue("d"));
-        }
-
+        ArgsCache.delete = line.hasOption("d");
 
         ArgsCache.database = System.getProperty("db.engine");
         ArgsCache.dbHost = System.getProperty("db.host");
