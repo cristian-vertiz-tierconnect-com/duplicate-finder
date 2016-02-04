@@ -53,6 +53,7 @@ public class CsvDAO {
 
         } catch (IOException e) {
             System.out.println("File " + filePath + " not found!");
+            ArgsCache.csvFile = null;
         }
         return  result;
     }
