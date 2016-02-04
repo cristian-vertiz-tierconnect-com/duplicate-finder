@@ -101,7 +101,7 @@ public class DbDAO {
 
                 countTF++;
                 if (countTF % TextUtils.MOD == 0) {
-                    System.out.print("\rGetting " + ArgsCache.database + " thingField values " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                    System.out.print("\rGetting " + ArgsCache.database + " thingField To thingTypeField map " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
                 }
 
             }
@@ -109,7 +109,7 @@ public class DbDAO {
             System.out.println("No connection available for " + System.getProperty("connection.url." + database));
         }
 
-        System.out.println("\rGetting " + ArgsCache.database + " thingField values [OK]");
+        System.out.println("\rGetting " + ArgsCache.database + " thingField To thingTypeField map [OK]");
 
         return thingFieldMap;
     }
@@ -144,7 +144,7 @@ public class DbDAO {
 
                 countTF++;
                 if (countTF % TextUtils.MOD == 0) {
-                    System.out.print("\rGetting " + ArgsCache.database + " thingField values " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                    System.out.print("\rGetting " + ArgsCache.database + " thingTypeField to thingField map " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
                 }
 
             }
@@ -152,7 +152,7 @@ public class DbDAO {
             System.out.println("No connection available for " + System.getProperty("connection.url." + database));
         }
 
-        System.out.println("\rGetting " + ArgsCache.database + " thingField values [OK]");
+        System.out.println("\rGetting " + ArgsCache.database + " thingTypeField to thingField map [OK]");
 
         return thingFieldMap;
     }

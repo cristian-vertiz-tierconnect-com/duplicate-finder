@@ -19,7 +19,6 @@ import java.util.*;
 public class DuplicateFinder {
 
 
-
     private static final String CONFIGURATION_FILE_PATH = "conf.properties";
     private static ArgsParser argsParser;
     private static CommandLine line;
@@ -38,13 +37,13 @@ public class DuplicateFinder {
 
         //Get values from databases
         Map<Long, List<Long>> thingFieldMap = DbDAO.getInstance().getThingFieldMap(ArgsCache.database);
-        Map<Long, List<Long>> thingFieldToThingTypeFieldMap = DbDAO.getInstance().getThingFieldMap(ArgsCache.database);
-        Map<Long, List<Long>> thingTypeFieldToThingFieldMap = DbDAO.getInstance().getThingFieldMap(ArgsCache.database);
+        Map<Long, Map<Long, Long>> thingFieldToThingTypeFieldMap = DbDAO.getInstance().getThingFieldToThingTypeFieldMap(ArgsCache.database);
+        Map<Long, Map<Long, Long>> thingTypeFieldToThingFieldMap = DbDAO.getInstance().getThingTypeFieldToThingFieldMap(ArgsCache.database);
         Map<Long, Long> thingFieldThingMap = DbDAO.getInstance().getThingFieldThingMap(ArgsCache.database);
         Map<String, List<Map<String, Object>>> thingMap = DbDAO.getInstance().getThingList(ArgsCache.database);
         List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readCsv(ArgsCache.csvFile);
-        Map<Long, Map<String, Object>> fieldValue = CassandraDAO.getInstance().getLastValues(thingFieldThingMap);
-        Map<Long, List<Map<String, Object>>> fieldValueHistory = CassandraDAO.getInstance().getHistory(thingFieldThingMap);
+        Map<Long, List<Map<String, Object>>> fieldValue = CassandraDAO.getInstance().getLastValues(thingFieldThingMap);
+        Map<Long, Map<Long, List<Map<String, Object>>>> fieldValueHistory = CassandraDAO.getInstance().getHistory(thingFieldThingMap);
 
         List<String> results = new ArrayList<>();
         results.add(buildHeaderCsv());
@@ -60,7 +59,7 @@ public class DuplicateFinder {
                 Map<String, Object> duplicate = getDuplicate(thing.get("serial").toString(),
                         (long) thing.get("id"), thingMap.get(ArgsCache.parentThingTypeCode));
 
-                if (!contains) {
+                if (!contains && ArgsCache.csvFile != null) {
                     if (isParent) {
                         if (duplicate != null) {
                             results.add(mergeThing(thing,
@@ -72,7 +71,10 @@ public class DuplicateFinder {
                                     fieldValue.get(Long.parseLong(duplicate.get("id").toString())),
                                     fieldValueHistory.get(Long.parseLong(duplicate.get("id").toString())),
                                     thingMap.get(ArgsCache.childrenThingTypeCode),
-                                    isParent, contains));
+                                    isParent, contains,
+                                    thingFieldToThingTypeFieldMap,
+                                    thingTypeFieldToThingFieldMap
+                            ));
                         } else {
                             results.add(doNothing(thing));
                         }
@@ -90,14 +92,14 @@ public class DuplicateFinder {
                             fieldValue.get(Long.parseLong(duplicate.get("id").toString())),
                             fieldValueHistory.get(Long.parseLong(duplicate.get("id").toString())),
                             thingMap.get(ArgsCache.childrenThingTypeCode),
-                            isParent, contains));
+                            isParent, contains, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap));
                 } else {
                     results.add(doNothing(thing));
                 }
             }
             countT++;
-            if (countT % (TextUtils.MOD / 1000) == 0) {
-                System.out.print("\rAnalysing duplicated values " + TextUtils.CAR[(int) (countT / TextUtils.MOD / 1000) % 4]);
+            if ((countT * 1000) % TextUtils.MOD == 0) {
+                System.out.print("\rAnalysing duplicated values " + TextUtils.CAR[(int) (countT * 1000 / TextUtils.MOD) % 4]);
             }
         }
         System.out.println("\rAnalysing duplicated values [OK]");
@@ -107,19 +109,21 @@ public class DuplicateFinder {
 
     private static String mergeThing(Map<String, Object> thing,
                                      List<Long> thingFieldList,
-                                     Map<String, Object> fieldValue,
-                                     List<Map<String, Object>> fieldValueHistory,
+                                     List<Map<String, Object>> fieldValue,
+                                     Map<Long, List<Map<String, Object>>> fieldValueHistory,
                                      Map<String, Object> duplicate,
                                      List<Long> duplicateThingFieldList,
-                                     Map<String, Object> duplicateFieldValue,
-                                     List<Map<String, Object>> duplicateFieldValueHistory,
+                                     List<Map<String, Object>> duplicateFieldValue,
+                                     Map<Long, List<Map<String, Object>>> duplicateFieldValueHistory,
                                      List<Map<String, Object>> thingMap,
-                                     boolean isParent, boolean isinCsv) throws SQLException {
+                                     boolean isParent, boolean isInCsv,
+                                     Map<Long, Map<Long, Long>> thingFieldToThingTypeFieldMap,
+                                     Map<Long, Map<Long, Long>> thingTypeFieldToThingFieldMap) throws SQLException {
 
 
         boolean duplicateIsParent = isParent(duplicate.get("serial").toString(), thingMap);
 
-        String action = "FOR MERGING";
+        String action = "";
         String serial = "";
         String id = "";
         String duplicateSerial = "";
@@ -128,8 +132,8 @@ public class DuplicateFinder {
         //if (ArgsCache.delete) {
         if (isParent) {
             if (ArgsCache.delete)
-                mergeThingData(thing, thingFieldList, fieldValue, fieldValueHistory, duplicate, duplicateThingFieldList,
-                        duplicateFieldValue, duplicateFieldValueHistory);
+                mergeThingData(thing, fieldValue, fieldValueHistory, duplicate,
+                        duplicateFieldValue, duplicateFieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
 
             id = thing.get("id").toString();
             serial = thing.get("serial").toString();
@@ -138,14 +142,15 @@ public class DuplicateFinder {
 
             if (ArgsCache.delete) {
                 deleteThing(duplicate, duplicateThingFieldList);
-                action = "MERGED1";
+                action = "MERGED";
+            } else {
+                action = "FOR MERGING";
             }
 
         } else {
             if (duplicateIsParent) {
-                mergeThingData(duplicate, duplicateThingFieldList,
-                        duplicateFieldValue, duplicateFieldValueHistory,
-                        thing, thingFieldList, fieldValue, fieldValueHistory);
+                mergeThingData(duplicate, duplicateFieldValue, duplicateFieldValueHistory,
+                        thing, fieldValue, fieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
 
                 isParent = true;
                 duplicateIsParent = false;
@@ -157,7 +162,9 @@ public class DuplicateFinder {
 
                 if (ArgsCache.delete) {
                     deleteThing(thing, thingFieldList);
-                    action = "MERGED2";
+                    action = "MERGED";
+                } else {
+                    action = "FOR MERGING";
                 }
             } else {
 
@@ -169,17 +176,19 @@ public class DuplicateFinder {
                 if (ArgsCache.delete) {
                     deleteThing(thing, thingFieldList);
                     deleteThing(duplicate, duplicateThingFieldList);
-                    action = "DELETED2";
+                    action = "DELETED";
+                } else {
+                    action = "FOR DELETING";
                 }
             }
-            }
+        }
         //}
 
         donotProcessList.add(Long.parseLong(thing.get("id").toString()));
         donotProcessList.add(Long.parseLong(duplicate.get("id").toString()));
 
 
-        return buildCsvRow(getLineMap(action, serial, id, isParent, isinCsv, duplicateId, duplicateSerial, duplicateIsParent));
+        return buildCsvRow(getLineMap(action, serial, id, isParent, isInCsv, duplicateId, duplicateSerial, duplicateIsParent));
     }
 
     public static Map<String, Object> getLineMap(String action,
@@ -203,9 +212,61 @@ public class DuplicateFinder {
         return out;
     }
 
-    private static void mergeThingData(Map<String, Object> thing, List<Long> thingFieldList, Map<String, Object> fieldValue, List<Map<String, Object>> fieldValueHistory, Map<String, Object> duplicate, List<Long> duplicatethingFieldList, Map<String, Object> duplicateFieldValue, List<Map<String, Object>> duplicateFieldValueHistory) {
+    private static void mergeThingData(Map<String, Object> thing,
+                                       List<Map<String, Object>> fieldValue,
+                                       Map<Long, List<Map<String, Object>>> fieldValueHistory,
+                                       Map<String, Object> duplicate,
+                                       List<Map<String, Object>> duplicateFieldValue,
+                                       Map<Long, List<Map<String, Object>>> duplicateFieldValueHistory,
+                                       Map<Long, Map<Long, Long>> thingFieldToThingTypeFieldMap,
+                                       Map<Long, Map<Long, Long>> thingTypeFieldToThingFieldMap) {
 
 
+        if (duplicateFieldValue != null && duplicateFieldValue.size() > 0) {
+
+            for (Map<String, Object> value : duplicateFieldValue) {
+                Map<String, Object> valueConverted = new HashMap<>();
+                valueConverted.putAll(value);
+                Long ttf = thingFieldToThingTypeFieldMap
+                        .get(Long.parseLong(duplicate.get("id").toString()))
+                        .get(Long.parseLong(value.get("field_id").toString()));
+
+                Long tf = thingTypeFieldToThingFieldMap.get(ttf).get(Long.parseLong(thing.get("id").toString()));
+
+                valueConverted.put("field_id", tf);
+                fieldValue.add(valueConverted);
+
+                CassandraDAO.getInstance().writeFieldValue(fieldValue);
+
+
+            }
+
+        }
+        if (duplicateFieldValueHistory != null && duplicateFieldValueHistory.size() > 0) {
+            for (Map.Entry<Long, List<Map<String, Object>>> fieldValueList : duplicateFieldValueHistory.entrySet()) {
+
+                for (Map<String, Object> value : fieldValueList.getValue()) {
+
+                    Map<String, Object> valueConverted = new HashMap<>();
+                    valueConverted.putAll(value);
+                    Long ttf = thingFieldToThingTypeFieldMap
+                            .get(Long.parseLong(duplicate.get("id").toString()))
+                            .get(Long.parseLong(value.get("field_id").toString()));
+
+                    Long tf = thingTypeFieldToThingFieldMap.get(ttf).get(Long.parseLong(thing.get("id").toString()));
+
+                    valueConverted.put("field_id", tf);
+
+                    if(!fieldValueHistory.containsKey(tf)){
+                        fieldValueHistory.get(tf).add(new HashMap<String, Object>());
+                    }
+
+                    fieldValueHistory.get(tf).add(valueConverted);
+
+                }
+            }
+            CassandraDAO.getInstance().writeFieldValueHistory(fieldValueHistory);
+        }
     }
 
     private static String deleteThing(Map<String, Object> thingMap,
@@ -320,7 +381,7 @@ public class DuplicateFinder {
         for (Map<String, Object> thing : thingList) {
             if (thing.get("serial").toString().equalsIgnoreCase(serial) &&
                     thingId != Long.parseLong(thing.get("id").toString())) {
-                System.out.println(serial + "|" + thingId + " = " + thing.get("serial") + "|" + thing.get("id"));
+                //System.out.println(serial + "|" + thingId + " = " + thing.get("serial") + "|" + thing.get("id"));
                 return thing;
             }
 

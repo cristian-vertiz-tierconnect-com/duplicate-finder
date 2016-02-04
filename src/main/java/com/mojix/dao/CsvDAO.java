@@ -1,5 +1,6 @@
 package com.mojix.dao;
 
+import com.mojix.cache.ArgsCache;
 import com.mojix.utils.TextUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -31,7 +32,7 @@ public class CsvDAO {
         try {
             Reader in = new FileReader(filePath);
             CSVParser records = CSVFormat.EXCEL.withHeader().withSkipHeaderRecord().parse(in);
-
+            long countTF = 0;
             for(CSVRecord row : records.getRecords()){
                 Map<String, Object> rowMap = new HashMap<>();
 
@@ -41,8 +42,14 @@ public class CsvDAO {
                 rowMap.put("serial", serial.isEmpty()?null:serial);
                 rowMap.put("parent", child);
                 result.add(rowMap);
+
+                countTF++;
+                if (countTF % TextUtils.MOD == 0) {
+                    System.out.print("\rReading csv file " + ArgsCache.csvFile + " " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                }
             }
 
+            System.out.println("\rReading csv file " + ArgsCache.csvFile + " [OK]");
 
         } catch (IOException e) {
             System.out.println("File " + filePath + " not found!");

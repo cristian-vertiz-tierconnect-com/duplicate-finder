@@ -2,15 +2,11 @@ package com.mojix.dao;
 
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.PreparedStatement;
-import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import com.mojix.driver.Cassandra;
 import com.mojix.utils.TextUtils;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by cvertiz on 2/2/16.
@@ -45,29 +41,32 @@ public class CassandraDAO {
         Cassandra.getSession().executeAsync(bsFVH);
     }
 
-    public Map<Long, List<Map<String, Object>>> getHistory(Map<Long, Long> thingFieldThingMap) {
-        Map<Long, List<Map<String, Object>>> result = new HashMap<>();
+    public Map<Long, Map<Long, List<Map<String, Object>>>> getHistory(Map<Long, Long> thingFieldThingMap) {
+        Map<Long, Map<Long, List<Map<String, Object>>>> result = new HashMap<>();
         long countFVH = 0;
         PreparedStatement selectFVH2 = Cassandra.getSession().prepare("SELECT field_id, at, value FROM field_value_history limit 1000000000");
         for (Row row : Cassandra.getSession().execute(new BoundStatement(selectFVH2))) {
 
             Long field_id = row.getLong("field_id");
             Long thing_id = thingFieldThingMap.get(field_id);
-            Long time = row.getDate("at").getTime();
+            Long at = row.getDate("at").getTime();
             String value = row.getString("value");
 
             Map<String, Object> rowValues = new HashMap<>();
 
             rowValues.put("field_id",field_id);
             rowValues.put("thing_id",thing_id);
-            rowValues.put("at",time);
+            rowValues.put("at", at);
             rowValues.put("value",value);
 
             if (!result.containsKey(thing_id)) {
-                result.put(thing_id, new ArrayList<Map<String, Object>>());
+                result.put(thing_id, new HashMap<Long, List<Map<String, Object>>>());
+            }
+            if (!result.get(thing_id).containsKey(field_id)) {
+                result.get(thing_id).put(field_id, new ArrayList<Map<String, Object>>());
             }
 
-            result.get(thing_id).add(rowValues);
+            result.get(thing_id).get(field_id).add(rowValues);
 
             countFVH++;
 
@@ -79,8 +78,8 @@ public class CassandraDAO {
         return  result;
     }
 
-    public Map<Long, Map<String, Object>> getLastValues(Map<Long, Long> thingFieldThingMap) {
-        Map<Long, Map<String, Object>> result = new HashMap<>();
+    public Map<Long, List<Map<String, Object>>> getLastValues(Map<Long, Long> thingFieldThingMap) {
+        Map<Long, List<Map<String, Object>>> result = new HashMap<>();
         long countFV = 0;
         PreparedStatement selectFVH2 = Cassandra.getSession().prepare("SELECT field_id, time, value FROM field_value limit 1000000000");
         for (Row row : Cassandra.getSession().execute(new BoundStatement(selectFVH2))) {
@@ -94,11 +93,14 @@ public class CassandraDAO {
 
             rowValues.put("field_id",field_id);
             rowValues.put("thing_id",thing_id);
-            rowValues.put("at",time);
+            rowValues.put("time", time);
             rowValues.put("value",value);
 
+            if (!result.containsKey(thing_id)) {
+                result.put(thing_id, new ArrayList<Map<String, Object>>());
+            }
 
-            result.put(thing_id, rowValues);
+            result.get(thing_id).add(rowValues);
 
             countFV++;
 
@@ -110,4 +112,37 @@ public class CassandraDAO {
         return  result;
     }
 
+    public void writeFieldValue(List<Map<String, Object>> fieldValue) {
+        PreparedStatement fieldValuePS = Cassandra.getSession().prepare(
+                "INSERT INTO field_value (field_id, time, value) VALUES (:fId, :t, :v)");
+        for (Map<String, Object> value : fieldValue) {
+            BoundStatement bsFV = new BoundStatement(fieldValuePS);
+
+            bsFV.setLong("fId", value.get("field_id") != null ? (long) value.get("field_id") : null);
+            bsFV.setDate("t", value.get("time") != null ? new Date((long) value.get("time")) : null);
+            bsFV.setString("v", value.get("value") != null ? value.get("value").toString() : null);
+
+            Cassandra.getSession().execute(bsFV);
+
+        }
+    }
+
+    public void writeFieldValueHistory(Map<Long, List<Map<String, Object>>> fieldValueHistory) {
+        PreparedStatement fieldValuePS = Cassandra.getSession().prepare(
+                "INSERT INTO field_value_history (field_id, at, value) VALUES (:fId, :t, :v)");
+
+        for (Map.Entry<Long, List<Map<String, Object>>> fieldValueList : fieldValueHistory.entrySet()) {
+
+            for (Map<String, Object> value : fieldValueList.getValue()) {
+                BoundStatement bsFV = new BoundStatement(fieldValuePS);
+                bsFV.setLong("fId", value.get("field_id") != null ? (long) value.get("field_id") : null);
+                bsFV.setDate("t", value.get("at") != null ? new Date((long) value.get("at")) : null);
+                bsFV.setString("v", value.get("value") != null ? value.get("value").toString() : null);
+                Cassandra.getSession().execute(bsFV);
+            }
+
+        }
+
+
+    }
 }
