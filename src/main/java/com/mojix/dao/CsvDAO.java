@@ -40,7 +40,7 @@ public class CsvDAO {
                 String child = TextUtils.cleanString(row.get("Serial Number"));
 
                 rowMap.put("serial", serial.isEmpty()?null:serial);
-                rowMap.put("parent", child);
+                //rowMap.put("parent", child);
                 result.add(rowMap);
 
                 countTF++;
