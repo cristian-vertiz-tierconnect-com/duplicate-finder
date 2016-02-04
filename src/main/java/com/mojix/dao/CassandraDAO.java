@@ -15,8 +15,8 @@ public class CassandraDAO {
 
     public static CassandraDAO INSTANCE = new CassandraDAO();
 
-    public static CassandraDAO getInstance(){
-        if(INSTANCE == null){
+    public static CassandraDAO getInstance() {
+        if (INSTANCE == null) {
             INSTANCE = new CassandraDAO();
         }
         return INSTANCE;
@@ -54,10 +54,10 @@ public class CassandraDAO {
 
             Map<String, Object> rowValues = new HashMap<>();
 
-            rowValues.put("field_id",field_id);
-            rowValues.put("thing_id",thing_id);
+            rowValues.put("field_id", field_id);
+            rowValues.put("thing_id", thing_id);
             rowValues.put("at", at);
-            rowValues.put("value",value);
+            rowValues.put("value", value);
 
             if (!result.containsKey(thing_id)) {
                 result.put(thing_id, new HashMap<Long, List<Map<String, Object>>>());
@@ -75,7 +75,7 @@ public class CassandraDAO {
             }
         }
         System.out.println("\rGetting Cassandra field_value_history [OK]");
-        return  result;
+        return result;
     }
 
     public Map<Long, List<Map<String, Object>>> getLastValues(Map<Long, Long> thingFieldThingMap) {
@@ -91,10 +91,10 @@ public class CassandraDAO {
 
             Map<String, Object> rowValues = new HashMap<>();
 
-            rowValues.put("field_id",field_id);
-            rowValues.put("thing_id",thing_id);
+            rowValues.put("field_id", field_id);
+            rowValues.put("thing_id", thing_id);
             rowValues.put("time", time);
-            rowValues.put("value",value);
+            rowValues.put("value", value);
 
             if (!result.containsKey(thing_id)) {
                 result.put(thing_id, new ArrayList<Map<String, Object>>());
@@ -109,7 +109,7 @@ public class CassandraDAO {
             }
         }
         System.out.println("\rGetting Cassandra field_value [OK]");
-        return  result;
+        return result;
     }
 
     public void writeFieldValue(List<Map<String, Object>> fieldValue) {
@@ -122,7 +122,7 @@ public class CassandraDAO {
             bsFV.setDate("t", value.get("time") != null ? new Date((long) value.get("time")) : null);
             bsFV.setString("v", value.get("value") != null ? value.get("value").toString() : null);
 
-            Cassandra.getSession().execute(bsFV);
+            Cassandra.getSession().executeAsync(bsFV);
 
         }
     }
@@ -138,7 +138,7 @@ public class CassandraDAO {
                 bsFV.setLong("fId", value.get("field_id") != null ? (long) value.get("field_id") : null);
                 bsFV.setDate("t", value.get("at") != null ? new Date((long) value.get("at")) : null);
                 bsFV.setString("v", value.get("value") != null ? value.get("value").toString() : null);
-                Cassandra.getSession().execute(bsFV);
+                Cassandra.getSession().executeAsync(bsFV);
             }
 
         }
