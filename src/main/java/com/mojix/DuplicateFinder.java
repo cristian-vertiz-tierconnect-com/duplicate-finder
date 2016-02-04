@@ -272,7 +272,7 @@ public class DuplicateFinder {
     private static String deleteThing(Map<String, Object> thingMap,
                                       List<Long> thingFieldList) throws SQLException {
 
-        String action = "FOR DELETION";
+        String action = "FOR DELETING";
 
         if (ArgsCache.delete) {
 
