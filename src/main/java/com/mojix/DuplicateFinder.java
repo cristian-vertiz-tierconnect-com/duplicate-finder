@@ -308,7 +308,8 @@ public class DuplicateFinder {
         out.put("IsParent", false);
 
 
-        return buildCsvRow(out);
+        return buildCsvRow(getLineMap(action, thingMap.get("serial").toString(),
+                thingMap.get("id").toString(),"", "", "", "", ""));
     }
 
     private static void saveResultsToFile(List<String> results) throws IOException {
