@@ -28,6 +28,8 @@ public class ArgsParser {
         options.addOption( "f", "file", true, "Csv file to search on" );
 
         options.addOption( "d", "Delete duplicates", false, "Delete duplicates without prompt" );
+
+        //options.addOption( "g", "Group code", true, "Group code filter" );
     }
 
     public CommandLine parseOptions( String[] args )

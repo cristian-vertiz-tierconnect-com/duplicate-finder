@@ -9,6 +9,7 @@ public class ArgsCache {
     public static String dbHost;
     public static String cassandraHost;
     public static String csvFile;
+//    public static String groupCode;
     public static String parentThingTypeCode;
     public static String childrenThingTypeCode;
     public static boolean delete;

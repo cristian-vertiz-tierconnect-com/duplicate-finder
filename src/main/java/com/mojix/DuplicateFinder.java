@@ -188,17 +188,17 @@ public class DuplicateFinder {
         donotProcessList.add(Long.parseLong(duplicate.get("id").toString()));
 
 
-        return buildCsvRow(getLineMap(action, serial, id, isParent, isInCsv, duplicateId, duplicateSerial, duplicateIsParent));
+        return buildCsvRow(getLineMap(action, serial, id, String.valueOf(isParent), String.valueOf(isInCsv), duplicateId, duplicateSerial, String.valueOf(duplicateIsParent)));
     }
 
     public static Map<String, Object> getLineMap(String action,
                                                  String serial,
                                                  String id,
-                                                 boolean isParent,
-                                                 boolean isInCsv,
+                                                 String isParent,
+                                                 String isInCsv,
                                                  String duplicateId,
                                                  String duplicateSerial,
-                                                 boolean duplicateIsParent) {
+                                                 String duplicateIsParent) {
         Map<String, Object> out = new HashMap<>();
         out.put("Action", action);
         out.put("Date", new Date());
@@ -278,7 +278,7 @@ public class DuplicateFinder {
 
             DbDAO.getInstance().deleteThing((long) thingMap.get("id"), ArgsCache.database);
             CassandraDAO.getInstance().deleteThing(thingFieldList);
-            action = "DELETED1";
+            action = "DELETED";
         }
 
 //        Map<String, Object> out = new HashMap<>();
@@ -291,7 +291,7 @@ public class DuplicateFinder {
 
         return buildCsvRow(getLineMap(action,
                 thingMap.get("serial").toString(),
-                thingMap.get("id").toString(), false, false, "", "", false));
+                thingMap.get("id").toString(), "false", "false", "", "", ""));
 
     }
 
@@ -449,7 +449,7 @@ public class DuplicateFinder {
         }
     }
 
-    public static void init(String[] args) throws ClassNotFoundException, SQLException, InstantiationException, IllegalAccessException {
+    public static boolean init(String[] args) throws ClassNotFoundException, SQLException, InstantiationException, IllegalAccessException {
         loadDefaultConfig();
 
 
@@ -463,11 +463,24 @@ public class DuplicateFinder {
 
         if (line.hasOption("p")) {
             ArgsCache.parentThingTypeCode = line.getOptionValue("p");
+        }else{
+            System.out.println("Parent thing type code required (use -p <thingTypeCode>)");
+            return false;
         }
 
         if (line.hasOption("c")) {
             ArgsCache.childrenThingTypeCode = line.getOptionValue("c");
+        }else{
+            System.out.println("Children thing type code required (use -c <thingTypeCode>)");
+            return false;
         }
+
+//        if (line.hasOption("g")) {
+//            ArgsCache.groupCode = line.getOptionValue("g");
+//        }else{
+//            System.out.println("Group code required (use -g <groupCode>)");
+//            return false;
+//        }
 
         ArgsCache.delete = line.hasOption("d");
 
@@ -476,6 +489,8 @@ public class DuplicateFinder {
         ArgsCache.cassandraHost = System.getProperty("cassandra.host");
 
         openConnections();
+
+        return true;
     }
 
     private static void loadDefaultConfig() {
@@ -500,13 +515,17 @@ public class DuplicateFinder {
 
         //mainMenu();
         try {
-            init(args);
+            if(init(args)){
+                System.out.println("Analysing...");
+                long ti = System.currentTimeMillis();
+                findDuplicates();
+                System.out.println("Done finding duplicates (elapsed time " + ((System.currentTimeMillis() - ti) / 1000) + " seconds)");
+                System.exit(0);
+            }else{
+                System.exit(-1);
+            }
 
-            System.out.println("Analysing...");
-            long ti = System.currentTimeMillis();
-            findDuplicates();
-            System.out.println("Done finding duplicates (elapsed time " + ((System.currentTimeMillis() - ti) / 1000) + " seconds)");
-            System.exit(0);
+
 
         } catch (Exception e) {
             e.printStackTrace();
