@@ -170,7 +170,6 @@ public class DuplicateFinder {
         //Get values from databases
         List<Map<String, Object>> thingFieldTable = DbDAO.getInstance().getThingFields(ArgsCache.database);
         Map<String, List<Map<String, Object>>> thingMap = DbDAO.getInstance().getThingList(ArgsCache.database);
-        List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readCsv(ArgsCache.csvFile);
         //Building structures
         Map<Long, List<Long>> thingFieldMap = DbDAO.getInstance().getThingFieldMap(thingFieldTable);
         Map<String, Map<Long, Long>> thingFieldNameMap = DbDAO.getInstance().getThingFieldNameMap(thingFieldTable);
