@@ -28,32 +28,37 @@ public class DbDAO {
     }
 
 
-    public Map<Long, List<Long>> getThingFieldMap(String database)
+    public List<Map<String, Object>> getThingFields(String database)
             throws SQLException, IllegalAccessException, InstantiationException, ClassNotFoundException {
 
         java.sql.ResultSet rs = null;
         if (conn != null && database.equals("mysql")) {
             rs = conn.createStatement().executeQuery(
-                    "SELECT id, thing_id, thingTypeFieldId " +
+                    "SELECT id, thing_id, thingTypeFieldId, name " +
                             "FROM thingfield");
         } else if (conn != null && database.equals("mssql")) {
             rs = conn.createStatement().executeQuery(
                     "SELECT id, thing_id, thingTypeFieldId " +
                             "FROM dbo.thingfield");
         }
-        Map<Long, List<Long>> thingFieldMap = new HashMap<>();
+        List<Map<String, Object>> thingFieldMap = new ArrayList<>();
         long countTF = 0;
         if (rs != null) {
             while (rs.next()) {
 
                 Long thingId = rs.getLong("thing_id");
                 Long thingFieldId = rs.getLong("id");
+                Long thingTypeFieldId = rs.getLong("thingTypeFieldId");
+                String name = rs.getString("name");
 
-                if (!thingFieldMap.containsKey(thingId)) {
-                    thingFieldMap.put(thingId, new ArrayList<Long>());
-                }
 
-                thingFieldMap.get(thingId).add(thingFieldId);
+                Map<String, Object> row = new HashMap<>();
+                row.put("thing_id",thingId);
+                row.put("id",thingFieldId);
+                row.put("thingTypeFieldId",thingTypeFieldId);
+                row.put("name",name);
+
+                thingFieldMap.add(row);
 
                 countTF++;
                 if (countTF % TextUtils.MOD == 0) {
@@ -70,28 +75,78 @@ public class DbDAO {
         return thingFieldMap;
     }
 
-
-    public Map<Long, Map<Long, Long>> getThingFieldToThingTypeFieldMap(String database)
+    public Map<Long, List<Long>> getThingFieldMap(List<Map<String, Object>> thingFields)
             throws SQLException, IllegalAccessException, InstantiationException, ClassNotFoundException {
 
-        java.sql.ResultSet rs = null;
-        if (conn != null && database.equals("mysql")) {
-            rs = conn.createStatement().executeQuery(
-                    "SELECT id, thing_id, thingTypeFieldId " +
-                            "FROM thingfield");
-        } else if (conn != null && database.equals("mssql")) {
-            rs = conn.createStatement().executeQuery(
-                    "SELECT id, thing_id, thingTypeFieldId " +
-                            "FROM dbo.thingfield");
+        long countTF = 0;
+        Map<Long, List<Long>> thingFieldMap = new HashMap<>();
+        if (thingFields != null && thingFields.size() > 0) {
+            for(Map<String, Object> row : thingFields){
+                Long thingId = Long.parseLong(row.get("thing_id").toString());
+                Long thingFieldId = Long.parseLong(row.get("id").toString());
+
+                if (!thingFieldMap.containsKey(thingId)) {
+                    thingFieldMap.put(thingId, new ArrayList<Long>());
+                }
+
+                thingFieldMap.get(thingId).add(thingFieldId);
+
+                countTF++;
+                if (countTF % TextUtils.MOD == 0) {
+                    System.out.print("\rBuilding " + ArgsCache.database + " thingField map " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                }
+            }
+
         }
+
+        System.out.println("\rBuilding " + ArgsCache.database + " thingField map [OK]");
+
+        return thingFieldMap;
+    }
+
+
+    public Map<String, Map<Long,Long>> getThingFieldNameMap(List<Map<String, Object>> thingFields)
+            throws SQLException, IllegalAccessException, InstantiationException, ClassNotFoundException {
+
+        long countTF = 0;
+        Map<String, Map<Long,Long>> thingFieldMap = new HashMap<>();
+        if (thingFields != null && thingFields.size() > 0) {
+            for(Map<String, Object> row : thingFields){
+                Long thingId = Long.parseLong(row.get("thing_id").toString());
+                Long thingFieldId = Long.parseLong(row.get("id").toString());
+                String name = row.get("name").toString();
+
+                if (!thingFieldMap.containsKey(name)) {
+                    thingFieldMap.put(name, new HashMap<Long, Long>());
+                }
+
+                thingFieldMap.get(name).put(thingId, thingFieldId);
+
+                countTF++;
+                if (countTF % TextUtils.MOD == 0) {
+                    System.out.print("\rBuilding " + ArgsCache.database + " thingField name map " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                }
+            }
+
+        }
+
+        System.out.println("\rBuilding " + ArgsCache.database + " thingField name map [OK]");
+
+        return thingFieldMap;
+    }
+
+    public Map<Long, Map<Long, Long>> getThingFieldToThingTypeFieldMap(List<Map<String, Object>> thingFields)
+            throws SQLException, IllegalAccessException, InstantiationException, ClassNotFoundException {
+
         Map<Long, Map<Long, Long>> thingFieldMap = new HashMap<>();
         long countTF = 0;
-        if (rs != null) {
-            while (rs.next()) {
 
-                Long thingId = rs.getLong("thing_id");
-                Long thingFieldId = rs.getLong("id");
-                Long thingTypeFieldId = rs.getLong("thingTypeFieldId");
+        if (thingFields != null && thingFields.size() > 0) {
+            for(Map<String, Object> row : thingFields){
+
+                Long thingId = Long.parseLong(row.get("thing_id").toString());
+                Long thingFieldId = Long.parseLong(row.get("id").toString());
+                Long thingTypeFieldId = Long.parseLong(row.get("thingTypeFieldId").toString());
 
                 if (!thingFieldMap.containsKey(thingId)) {
                     thingFieldMap.put(thingId, new HashMap<Long, Long>());
@@ -101,40 +156,28 @@ public class DbDAO {
 
                 countTF++;
                 if (countTF % TextUtils.MOD == 0) {
-                    System.out.print("\rGetting " + ArgsCache.database + " thingField To thingTypeField map " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                    System.out.print("\rBuilding " + ArgsCache.database + " thingField To thingTypeField map " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
                 }
 
             }
-        } else {
-            System.out.println("No connection available for " + System.getProperty("connection.url." + database));
         }
 
-        System.out.println("\rGetting " + ArgsCache.database + " thingField To thingTypeField map [OK]");
+        System.out.println("\rBuilding " + ArgsCache.database + " thingField To thingTypeField map [OK]");
 
         return thingFieldMap;
     }
 
-    public Map<Long, Map<Long, Long>> getThingTypeFieldToThingFieldMap(String database)
+    public Map<Long, Map<Long, Long>> getThingTypeFieldToThingFieldMap(List<Map<String, Object>> thingFields)
             throws SQLException, IllegalAccessException, InstantiationException, ClassNotFoundException {
 
-        java.sql.ResultSet rs = null;
-        if (conn != null && database.equals("mysql")) {
-            rs = conn.createStatement().executeQuery(
-                    "SELECT id, thing_id, thingTypeFieldId " +
-                            "FROM thingfield");
-        } else if (conn != null && database.equals("mssql")) {
-            rs = conn.createStatement().executeQuery(
-                    "SELECT id, thing_id, thingTypeFieldId " +
-                            "FROM dbo.thingfield");
-        }
         Map<Long, Map<Long, Long>> thingFieldMap = new HashMap<>();
         long countTF = 0;
-        if (rs != null) {
-            while (rs.next()) {
+        if (thingFields != null && thingFields.size() > 0) {
+            for(Map<String, Object> row : thingFields){
 
-                Long thingId = rs.getLong("thing_id");
-                Long thingFieldId = rs.getLong("id");
-                Long thingTypeFieldId = rs.getLong("thingTypeFieldId");
+                Long thingId = Long.parseLong(row.get("thing_id").toString());
+                Long thingFieldId = Long.parseLong(row.get("id").toString());
+                Long thingTypeFieldId = Long.parseLong(row.get("thingTypeFieldId").toString());
 
                 if (!thingFieldMap.containsKey(thingTypeFieldId)) {
                     thingFieldMap.put(thingTypeFieldId, new HashMap<Long, Long>());
@@ -144,51 +187,37 @@ public class DbDAO {
 
                 countTF++;
                 if (countTF % TextUtils.MOD == 0) {
-                    System.out.print("\rGetting " + ArgsCache.database + " thingTypeField to thingField map " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                    System.out.print("\rBuilding " + ArgsCache.database + " thingTypeField to thingField map " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
                 }
 
             }
-        } else {
-            System.out.println("No connection available for " + System.getProperty("connection.url." + database));
         }
 
-        System.out.println("\rGetting " + ArgsCache.database + " thingTypeField to thingField map [OK]");
+        System.out.println("\rBuilding " + ArgsCache.database + " thingTypeField to thingField map [OK]");
 
         return thingFieldMap;
     }
 
-    public Map<Long, Long> getThingFieldThingMap(String database)
+    public Map<Long, Long> getThingFieldThingMap(List<Map<String, Object>> thingFields)
             throws SQLException, IllegalAccessException, InstantiationException, ClassNotFoundException {
 
-        java.sql.ResultSet rs = null;
-        if (conn != null && database.equals("mysql")) {
-            rs = conn.createStatement().executeQuery(
-                    "SELECT id, thing_id, thingTypeFieldId " +
-                            "FROM thingfield");
-        } else if (conn != null && database.equals("mssql")) {
-            rs = conn.createStatement().executeQuery(
-                    "SELECT id, thing_id, thingTypeFieldId " +
-                            "FROM dbo.thingfield");
-        }
         Map<Long, Long> thingFieldMap = new HashMap<>();
         long countTF = 0;
-        if (rs != null) {
-            while (rs.next()) {
+        if (thingFields != null && thingFields.size() > 0) {
+            for(Map<String, Object> row : thingFields){
 
-                Long thingId = rs.getLong("thing_id");
-                Long thingFieldId = rs.getLong("id");
+                Long thingId = Long.parseLong(row.get("thing_id").toString());
+                Long thingFieldId = Long.parseLong(row.get("id").toString());
 
                 thingFieldMap.put(thingFieldId, thingId);
                 countTF++;
                 if (countTF % TextUtils.MOD == 0) {
-                    System.out.print("\rGetting " + ArgsCache.database + " thingField to thing map " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
+                    System.out.print("\rBuilding " + ArgsCache.database + " thingField to thing map " + TextUtils.CAR[(int) (countTF / TextUtils.MOD) % 4]);
                 }
             }
-        } else {
-            System.out.println("No connection available for " + System.getProperty("connection.url." + database));
         }
 
-        System.out.println("\rGetting " + ArgsCache.database + " thingField to thing map [OK]");
+        System.out.println("\rBuilding " + ArgsCache.database + " thingField to thing map [OK]");
         return thingFieldMap;
     }
 

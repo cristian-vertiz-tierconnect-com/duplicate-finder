@@ -8,7 +8,7 @@ public class TextUtils {
     public final static String[] CAR = {"|", "/", "-", "\\"};
     public final static long MOD = 10000;
 
-    private static String[] replace = {"\n", " "};
+    private static String[] replace = {"\n", " ", "'", "\""};
 
     public static String cleanString(String text){
         for(String item : replace){

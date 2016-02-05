@@ -28,7 +28,7 @@ public class DuplicateFinder {
 
     private static List<Long> donotProcessList = new ArrayList<>();
 
-    public static void findDuplicates()
+    public static void cleanWithCsv()
             throws ClassNotFoundException,
             SQLException,
             InstantiationException,
@@ -36,14 +36,18 @@ public class DuplicateFinder {
             IOException {
 
         //Get values from databases
-        Map<Long, List<Long>> thingFieldMap = DbDAO.getInstance().getThingFieldMap(ArgsCache.database);
-        Map<Long, Map<Long, Long>> thingFieldToThingTypeFieldMap = DbDAO.getInstance().getThingFieldToThingTypeFieldMap(ArgsCache.database);
-        Map<Long, Map<Long, Long>> thingTypeFieldToThingFieldMap = DbDAO.getInstance().getThingTypeFieldToThingFieldMap(ArgsCache.database);
-        Map<Long, Long> thingFieldThingMap = DbDAO.getInstance().getThingFieldThingMap(ArgsCache.database);
+        List<Map<String, Object>> thingFieldTable = DbDAO.getInstance().getThingFields(ArgsCache.database);
         Map<String, List<Map<String, Object>>> thingMap = DbDAO.getInstance().getThingList(ArgsCache.database);
         List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readCsv(ArgsCache.csvFile);
-        Map<Long, List<Map<String, Object>>> fieldValue = CassandraDAO.getInstance().getLastValues(thingFieldThingMap);
+        //Building structures
+        Map<Long, List<Long>> thingFieldMap = DbDAO.getInstance().getThingFieldMap(thingFieldTable);
+        Map<String, Map<Long, Long>> thingFieldNameMap = DbDAO.getInstance().getThingFieldNameMap(thingFieldTable);
+        Map<Long, Map<Long, Long>> thingFieldToThingTypeFieldMap = DbDAO.getInstance().getThingFieldToThingTypeFieldMap(thingFieldTable);
+        Map<Long, Map<Long, Long>> thingTypeFieldToThingFieldMap = DbDAO.getInstance().getThingTypeFieldToThingFieldMap(thingFieldTable);
+        Map<Long, Long> thingFieldThingMap = DbDAO.getInstance().getThingFieldThingMap(thingFieldTable);
+
         Map<Long, Map<Long, List<Map<String, Object>>>> fieldValueHistory = CassandraDAO.getInstance().getHistory(thingFieldThingMap);
+        Map<Long, List<Map<String, Object>>> fieldValue = CassandraDAO.getInstance().getLastValues(thingFieldThingMap);
 
         List<String> results = new ArrayList<>();
         results.add(buildHeaderCsv());
@@ -51,7 +55,7 @@ public class DuplicateFinder {
         //Loop things from mysql/mssql
         //If thing is nor in csv file and thing has no child "delete" else "merge"
         long countT = 0;
-        for (Map<String, Object> thing : thingMap.get(ArgsCache.parentThingTypeCode)) {
+        for (Map<String, Object> thing : filterByQuery(thingMap.get(ArgsCache.parentThingTypeCode), thingFieldNameMap, fieldValue)) {
 
             if (!donotProcessList.contains(Long.parseLong(thing.get("id").toString()))) {
                 boolean contains = csvContains(thing.get("serial").toString(), csvFileList);
@@ -76,7 +80,7 @@ public class DuplicateFinder {
                                     thingTypeFieldToThingFieldMap
                             ));
                         } else {
-                            results.add(doNothing(thing));
+                            results.add(doNothing(thing, contains, isParent));
                         }
                     } else {
                         results.add(deleteThing(thing,
@@ -94,7 +98,7 @@ public class DuplicateFinder {
                             thingMap.get(ArgsCache.childrenThingTypeCode),
                             isParent, contains, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap));
                 } else {
-                    results.add(doNothing(thing));
+                    results.add(doNothing(thing, contains, isParent));
                 }
             }
             countT++;
@@ -105,6 +109,33 @@ public class DuplicateFinder {
         System.out.println("\rAnalysing duplicated values [OK]");
         saveResultsToFile(results);
 
+    }
+
+    private static List<Map<String, Object>> filterByQuery(List<Map<String, Object>> things,
+                                                           Map<String, Map<Long, Long>> thingFieldNameMap,
+                                                           Map<Long, List<Map<String, Object>>> fieldValue) {
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        if (line.hasOption("q")) {
+            for (Map<String, Object> thing : things) {
+                if (fieldValue.containsKey(Long.parseLong(thing.get("id").toString()))) {
+                    for (Map<String, Object> item : fieldValue.get(Long.parseLong(thing.get("id").toString()))) {
+                        if (thingFieldNameMap
+                                .get(ArgsCache.udfKey)
+                                .get(Long.parseLong(thing.get("id").toString())) == Long.parseLong(item.get("field_id").toString()) &&
+                                TextUtils.cleanString(item.get("value").toString()).equals(TextUtils.cleanString(ArgsCache.udFValue))) {
+                            result.add(thing);
+                        }
+
+                    }
+
+                }
+            }
+        } else {
+            return things;
+        }
+
+        return result;
     }
 
     private static String mergeThing(Map<String, Object> thing,
@@ -295,21 +326,12 @@ public class DuplicateFinder {
 
     }
 
-    private static String doNothing(Map<String, Object> thingMap) {
+    private static String doNothing(Map<String, Object> thingMap, boolean contains, boolean isParent) {
 
         String action = "KEEP(NO ACTION)";
 
-        Map<String, Object> out = new HashMap<>();
-        out.put("Action", action);
-        out.put("Date", new Date());
-        out.put("Serial", thingMap.get("serial"));
-        out.put("Id", thingMap.get("id"));
-        out.put("IsInCsv", false);
-        out.put("IsParent", false);
-
-
         return buildCsvRow(getLineMap(action, thingMap.get("serial").toString(),
-                thingMap.get("id").toString(),"", "", "", "", ""));
+                thingMap.get("id").toString(), String.valueOf(isParent), String.valueOf(contains), "", "", ""));
     }
 
     private static void saveResultsToFile(List<String> results) throws IOException {
@@ -429,7 +451,7 @@ public class DuplicateFinder {
                     case "1":
                         System.out.println("Finding duplicates...");
                         long ti = System.currentTimeMillis();
-                        findDuplicates();
+                        cleanWithCsv();
                         System.out.println("Done finding duplicates (elapsed time " + ((System.currentTimeMillis() - ti) / 1000) + " seconds)");
                         break;
                     case "x":
@@ -476,6 +498,11 @@ public class DuplicateFinder {
             return false;
         }
 
+        if (line.hasOption("q")) {
+            ArgsCache.udfKey = line.getOptionValue("q").split("=")[0];
+            ArgsCache.udFValue = line.getOptionValue("q").split("=")[1];
+        }
+
 //        if (line.hasOption("g")) {
 //            ArgsCache.groupCode = line.getOptionValue("g");
 //        }else{
@@ -519,7 +546,7 @@ public class DuplicateFinder {
             if(init(args)){
                 System.out.println("Analysing...");
                 long ti = System.currentTimeMillis();
-                findDuplicates();
+                cleanWithCsv();
                 System.out.println("Done finding duplicates (elapsed time " + ((System.currentTimeMillis() - ti) / 1000) + " seconds)");
                 System.exit(0);
             }else{

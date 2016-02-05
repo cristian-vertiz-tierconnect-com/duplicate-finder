@@ -29,7 +29,7 @@ public class ArgsParser {
 
         options.addOption( "d", "delete", false, "Delete duplicates without prompt" );
 
-        //options.addOption( "g", "Group code", true, "Group code filter" );
+        options.addOption( "q", "query", true, "Udf query filter" );
     }
 
     public CommandLine parseOptions( String[] args )

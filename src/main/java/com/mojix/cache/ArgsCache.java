@@ -13,5 +13,7 @@ public class ArgsCache {
     public static String parentThingTypeCode;
     public static String childrenThingTypeCode;
     public static boolean delete;
+    public static String udFValue;
+    public static String udfKey;
 
 }
