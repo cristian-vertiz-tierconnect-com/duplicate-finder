@@ -264,7 +264,7 @@ public class DuplicateFinder {
                                   Map<String, Map<Long, Long>> thingFieldNameMap,
                                   List<Map<String, Object>> fieldValue) {
 
-        if (fieldValue != null) {
+        if (fieldValue != null && ArgsCache.udfKey != null && ArgsCache.udFValue != null) {
             for (Map<String, Object> item : fieldValue) {
                 if (thingFieldNameMap
                         .get(ArgsCache.udfKey)
