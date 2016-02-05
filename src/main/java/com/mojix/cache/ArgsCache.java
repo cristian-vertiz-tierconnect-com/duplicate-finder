@@ -15,5 +15,8 @@ public class ArgsCache {
     public static boolean delete;
     public static String udFValue;
     public static String udfKey;
+    public static boolean restrictQuery;
+    public static boolean verbose;
+
 
 }

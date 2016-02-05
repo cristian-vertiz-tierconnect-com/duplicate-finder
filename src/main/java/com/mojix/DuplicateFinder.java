@@ -23,10 +23,24 @@ public class DuplicateFinder {
     private static ArgsParser argsParser;
     private static CommandLine line;
 
-    private static String[] csvHeader = {"Action", "Date", "Serial", "Id", "IsInCsv", "IsParent", "DuplicateId", "DuplicateSerial", "DuplicateIsParent"};
+    private static String[] csvHeader = {"Action", "Date", "Serial", "Id", "IsInCsv", "IsParent", "Plant", "DuplicateId", "DuplicateSerial", "DuplicateIsParent", "DuplicatePlant"};
 
 
-    private static List<Long> donotProcessList = new ArrayList<>();
+    private static List<Long> doNotProcessList = new ArrayList<>();
+
+    public static void run()
+            throws ClassNotFoundException,
+            SQLException,
+            InstantiationException,
+            IllegalAccessException,
+            IOException {
+        if (ArgsCache.csvFile != null) {
+            cleanWithCsv();
+        } else {
+            cleanDuplicates();
+        }
+
+    }
 
     public static void cleanWithCsv()
             throws ClassNotFoundException,
@@ -52,19 +66,30 @@ public class DuplicateFinder {
         List<String> results = new ArrayList<>();
         results.add(buildHeaderCsv());
 
+
+        List<String> noCsvParent = new ArrayList<>();
+        List<String> noCsvParentNoDuplicate = new ArrayList<>();
+        List<String> csvNoDuplicate = new ArrayList<>();
+
         //Loop things from mysql/mssql
         //If thing is nor in csv file and thing has no child "delete" else "merge"
         long countT = 0;
-        for (Map<String, Object> thing : filterByQuery(thingMap.get(ArgsCache.parentThingTypeCode), thingFieldNameMap, fieldValue)) {
 
-            if (!donotProcessList.contains(Long.parseLong(thing.get("id").toString()))) {
+        List<Map<String, Object>> filteredThings = filterByQuery(thingMap.get(ArgsCache.parentThingTypeCode), thingFieldNameMap, fieldValue);
+
+        for (Map<String, Object> thing : filteredThings) {
+
+            if (!doNotProcessList.contains(Long.parseLong(thing.get("id").toString()))) {
                 boolean contains = csvContains(thing.get("serial").toString(), csvFileList);
                 boolean isParent = isParent(thing.get("serial").toString(), thingMap.get(ArgsCache.childrenThingTypeCode));
                 Map<String, Object> duplicate = getDuplicate(thing.get("serial").toString(),
-                        (long) thing.get("id"), thingMap.get(ArgsCache.parentThingTypeCode));
+                        (long) thing.get("id"),
+                        ArgsCache.restrictQuery ? filteredThings : thingMap.get(ArgsCache.parentThingTypeCode));
 
                 if (!contains && ArgsCache.csvFile != null) {
                     if (isParent) {
+                        if (!noCsvParent.contains(thing.get("serial").toString()))
+                            noCsvParent.add(thing.get("serial").toString());
                         if (duplicate != null) {
                             results.add(mergeThing(thing,
                                     thingFieldMap.get(Long.parseLong(thing.get("id").toString())),
@@ -77,14 +102,15 @@ public class DuplicateFinder {
                                     thingMap.get(ArgsCache.childrenThingTypeCode),
                                     isParent, contains,
                                     thingFieldToThingTypeFieldMap,
-                                    thingTypeFieldToThingFieldMap
-                            ));
+                                    thingTypeFieldToThingFieldMap, thingFieldNameMap));
                         } else {
-                            results.add(doNothing(thing, contains, isParent));
+                            if (!noCsvParentNoDuplicate.contains(thing.get("serial").toString()))
+                                noCsvParentNoDuplicate.add(thing.get("serial").toString());
+                            results.add(doNothing(thing, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, fieldValue), contains, isParent));
                         }
                     } else {
                         results.add(deleteThing(thing,
-                                thingFieldMap.get(Long.parseLong(thing.get("id").toString()))));
+                                thingFieldMap.get(Long.parseLong(thing.get("id").toString())), getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, fieldValue), isParent, contains));
                     }
                 } else if (duplicate != null) {
                     results.add(mergeThing(thing,
@@ -96,9 +122,98 @@ public class DuplicateFinder {
                             fieldValue.get(Long.parseLong(duplicate.get("id").toString())),
                             fieldValueHistory.get(Long.parseLong(duplicate.get("id").toString())),
                             thingMap.get(ArgsCache.childrenThingTypeCode),
-                            isParent, contains, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap));
+                            isParent, contains, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap, thingFieldNameMap));
                 } else {
-                    results.add(doNothing(thing, contains, isParent));
+                    if (!csvNoDuplicate.contains(thing.get("serial").toString()))
+                        csvNoDuplicate.add(thing.get("serial").toString());
+                    results.add(doNothing(thing, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, fieldValue), contains, isParent));
+                }
+            }
+            countT++;
+            if ((countT * 1000) % TextUtils.MOD == 0) {
+                System.out.print("\rAnalysing csv and databases values " + TextUtils.CAR[(int) (countT * 1000 / TextUtils.MOD) % 4]);
+            }
+        }
+        System.out.println("\rAnalysing csv and databases values [OK]");
+        saveResultsToFile(results);
+
+        List<String> csvNoDb = new ArrayList<>();
+
+
+        for (Map<String, Object> row : csvFileList) {
+            boolean is = false;
+            for (Map<String, Object> thing : thingMap.get(ArgsCache.parentThingTypeCode)) {
+                if (thing.get("serial").toString().equals(row.get("serial"))) {
+                    is = true;
+                }
+            }
+            if (!is && !csvNoDb.contains(row.get("serial").toString())) {
+                csvNoDb.add(row.get("serial").toString());
+            }
+        }
+        if (ArgsCache.verbose) {
+            System.out.println("In csv and not in db " + csvNoDb.size() + " ---- " + csvNoDb);
+            System.out.println("Not in csv and parent and duplicated " + noCsvParent.size() + " ---- " + noCsvParent);
+            System.out.println("Not in csv and parent and no duplicate" + noCsvParentNoDuplicate.size() + " ---- " + noCsvParentNoDuplicate);
+            System.out.println("InCsv and not duplicate " + csvNoDuplicate.size() + " ---- " + csvNoDuplicate);
+        }
+
+    }
+
+    public static void cleanDuplicates()
+            throws ClassNotFoundException,
+            SQLException,
+            InstantiationException,
+            IllegalAccessException,
+            IOException {
+
+        //Get values from databases
+        List<Map<String, Object>> thingFieldTable = DbDAO.getInstance().getThingFields(ArgsCache.database);
+        Map<String, List<Map<String, Object>>> thingMap = DbDAO.getInstance().getThingList(ArgsCache.database);
+        List<Map<String, Object>> csvFileList = CsvDAO.getInstance().readCsv(ArgsCache.csvFile);
+        //Building structures
+        Map<Long, List<Long>> thingFieldMap = DbDAO.getInstance().getThingFieldMap(thingFieldTable);
+        Map<String, Map<Long, Long>> thingFieldNameMap = DbDAO.getInstance().getThingFieldNameMap(thingFieldTable);
+        Map<Long, Map<Long, Long>> thingFieldToThingTypeFieldMap = DbDAO.getInstance().getThingFieldToThingTypeFieldMap(thingFieldTable);
+        Map<Long, Map<Long, Long>> thingTypeFieldToThingFieldMap = DbDAO.getInstance().getThingTypeFieldToThingFieldMap(thingFieldTable);
+        Map<Long, Long> thingFieldThingMap = DbDAO.getInstance().getThingFieldThingMap(thingFieldTable);
+
+        Map<Long, Map<Long, List<Map<String, Object>>>> fieldValueHistory = CassandraDAO.getInstance().getHistory(thingFieldThingMap);
+        Map<Long, List<Map<String, Object>>> fieldValue = CassandraDAO.getInstance().getLastValues(thingFieldThingMap);
+
+        List<String> results = new ArrayList<>();
+        results.add(buildHeaderCsv());
+
+
+        //Loop things from mysql/mssql
+        //If thing is nor in csv file and thing has no child "delete" else "merge"
+        long countT = 0;
+
+        List<Map<String, Object>> filteredThings = filterByQuery(thingMap.get(ArgsCache.parentThingTypeCode), thingFieldNameMap, fieldValue);
+
+        for (Map<String, Object> thing : filteredThings) {
+
+            if (!doNotProcessList.contains(Long.parseLong(thing.get("id").toString()))) {
+                boolean isParent = isParent(thing.get("serial").toString(), thingMap.get(ArgsCache.childrenThingTypeCode));
+                Map<String, Object> duplicate = getDuplicate(thing.get("serial").toString(),
+                        (long) thing.get("id"),
+                        ArgsCache.restrictQuery ? filteredThings : thingMap.get(ArgsCache.parentThingTypeCode));
+
+                if (duplicate != null) {
+                    results.add(mergeThing(thing,
+                            thingFieldMap.get(Long.parseLong(thing.get("id").toString())),
+                            fieldValue.get(Long.parseLong(thing.get("id").toString())),
+                            fieldValueHistory.get(Long.parseLong(thing.get("id").toString())),
+                            duplicate,
+                            thingFieldMap.get(Long.parseLong(duplicate.get("id").toString())),
+                            fieldValue.get(Long.parseLong(duplicate.get("id").toString())),
+                            fieldValueHistory.get(Long.parseLong(duplicate.get("id").toString())),
+                            thingMap.get(ArgsCache.childrenThingTypeCode),
+                            isParent, true,
+                            thingFieldToThingTypeFieldMap,
+                            thingTypeFieldToThingFieldMap, thingFieldNameMap));
+                } else {
+                    results.add(doNothing(thing, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, fieldValue), true, isParent));
                 }
             }
             countT++;
@@ -111,31 +226,65 @@ public class DuplicateFinder {
 
     }
 
+
     private static List<Map<String, Object>> filterByQuery(List<Map<String, Object>> things,
                                                            Map<String, Map<Long, Long>> thingFieldNameMap,
                                                            Map<Long, List<Map<String, Object>>> fieldValue) {
         List<Map<String, Object>> result = new ArrayList<>();
 
-        if (line.hasOption("q")) {
+        if (ArgsCache.udFValue != null && ArgsCache.udfKey != null) {
             for (Map<String, Object> thing : things) {
-                if (fieldValue.containsKey(Long.parseLong(thing.get("id").toString()))) {
-                    for (Map<String, Object> item : fieldValue.get(Long.parseLong(thing.get("id").toString()))) {
-                        if (thingFieldNameMap
-                                .get(ArgsCache.udfKey)
-                                .get(Long.parseLong(thing.get("id").toString())) == Long.parseLong(item.get("field_id").toString()) &&
-                                TextUtils.cleanString(item.get("value").toString()).equals(TextUtils.cleanString(ArgsCache.udFValue))) {
-                            result.add(thing);
-                        }
-
-                    }
-
+                if (fieldValue.containsKey(Long.parseLong(thing.get("id").toString())) &&
+                        getValue(thing, thingFieldNameMap, fieldValue).equals(ArgsCache.udFValue)) {
+                    result.add(thing);
                 }
             }
+
+//            for (Map<String, Object> thing : things) {
+//                if (fieldValue.containsKey(Long.parseLong(thing.get("id").toString())) ) {
+//                    for (Map<String, Object> item : fieldValue.get(Long.parseLong(thing.get("id").toString()))) {
+//                        if (thingFieldNameMap
+//                                .get(ArgsCache.udfKey)
+//                                .get(Long.parseLong(thing.get("id").toString())) == Long.parseLong(item.get("field_id").toString()) &&
+//                                TextUtils.cleanString(item.get("value").toString()).equals(TextUtils.cleanString(ArgsCache.udFValue))) {
+//                            result.add(thing);
+//                        }
+//
+//                    }
+//
+//                }
+//            }
         } else {
             return things;
         }
 
         return result;
+    }
+
+    public static String getValue(Map<String, Object> thing,
+                                  Map<String, Map<Long, Long>> thingFieldNameMap,
+                                  List<Map<String, Object>> fieldValue) {
+
+        if (fieldValue != null) {
+            for (Map<String, Object> item : fieldValue) {
+                if (thingFieldNameMap
+                        .get(ArgsCache.udfKey)
+                        .get(Long.parseLong(thing.get("id").toString())) == Long.parseLong(item.get("field_id").toString())) {
+                    return TextUtils.cleanString(item.get("value").toString());
+                }
+            }
+        }
+
+        return "";
+    }
+
+    public static String getValue(Map<String, Object> thing,
+                                  Map<String, Map<Long, Long>> thingFieldNameMap,
+                                  Map<Long, List<Map<String, Object>>> fieldValue) {
+        if (thing != null && fieldValue.containsKey(Long.parseLong(thing.get("id").toString()))) {
+            return getValue(thing, thingFieldNameMap, fieldValue.get(Long.parseLong(thing.get("id").toString())));
+        }
+        return "";
     }
 
     private static String mergeThing(Map<String, Object> thing,
@@ -147,9 +296,10 @@ public class DuplicateFinder {
                                      List<Map<String, Object>> duplicateFieldValue,
                                      Map<Long, List<Map<String, Object>>> duplicateFieldValueHistory,
                                      List<Map<String, Object>> thingMap,
-                                     boolean isParent, boolean isInCsv,
+                                     Boolean isParent, Boolean isInCsv,
                                      Map<Long, Map<Long, Long>> thingFieldToThingTypeFieldMap,
-                                     Map<Long, Map<Long, Long>> thingTypeFieldToThingFieldMap) throws SQLException {
+                                     Map<Long, Map<Long, Long>> thingTypeFieldToThingFieldMap,
+                                     Map<String, Map<Long, Long>> thingFieldNameMap) throws SQLException {
 
 
         boolean duplicateIsParent = isParent(duplicate.get("serial").toString(), thingMap);
@@ -160,28 +310,8 @@ public class DuplicateFinder {
         String duplicateSerial = "";
         String duplicateId = "";
 
-        //if (ArgsCache.delete) {
-        if (isParent) {
-            if (ArgsCache.delete)
-                mergeThingData(thing, fieldValue, fieldValueHistory, duplicate,
-                        duplicateFieldValue, duplicateFieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
-
-            id = thing.get("id").toString();
-            serial = thing.get("serial").toString();
-            duplicateId = duplicate.get("id").toString();
-            duplicateSerial = duplicate.get("serial").toString();
-
-            if (ArgsCache.delete) {
-                deleteThing(duplicate, duplicateThingFieldList);
-                action = "MERGED";
-            } else {
-                action = "FOR MERGING";
-            }
-
-        } else {
+        if (isInCsv) {
             if (duplicateIsParent) {
-                mergeThingData(duplicate, duplicateFieldValue, duplicateFieldValueHistory,
-                        thing, fieldValue, fieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
 
                 isParent = true;
                 duplicateIsParent = false;
@@ -192,7 +322,9 @@ public class DuplicateFinder {
                 duplicateSerial = thing.get("serial").toString();
 
                 if (ArgsCache.delete) {
-                    deleteThing(thing, thingFieldList);
+                    mergeThingData(duplicate, duplicateFieldValue, duplicateFieldValueHistory,
+                            thing, fieldValue, fieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
+                    deleteThing(thing, thingFieldList, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
                     action = "MERGED";
                 } else {
                     action = "FOR MERGING";
@@ -205,21 +337,46 @@ public class DuplicateFinder {
                 duplicateSerial = duplicate.get("serial").toString();
 
                 if (ArgsCache.delete) {
-                    deleteThing(thing, thingFieldList);
-                    deleteThing(duplicate, duplicateThingFieldList);
-                    action = "DELETED";
+                    mergeThingData(thing, fieldValue, fieldValueHistory, duplicate,
+                            duplicateFieldValue, duplicateFieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
+                    deleteThing(duplicate, duplicateThingFieldList, getValue(thing, thingFieldNameMap, duplicateFieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
+                    action = "MERGED";
                 } else {
-                    action = "FOR DELETING";
+                    action = "FOR MERGING";
                 }
             }
+
+
+        } else {
+
+            id = thing.get("id").toString();
+            serial = thing.get("serial").toString();
+            duplicateId = duplicate.get("id").toString();
+            duplicateSerial = duplicate.get("serial").toString();
+
+            if (ArgsCache.delete) {
+                mergeThingData(thing, fieldValue, fieldValueHistory, duplicate,
+                        duplicateFieldValue, duplicateFieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
+                deleteThing(duplicate, duplicateThingFieldList, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
+                action = "MERGED";
+            } else {
+                action = "FOR MERGING";
+            }
         }
-        //}
 
-        donotProcessList.add(Long.parseLong(thing.get("id").toString()));
-        donotProcessList.add(Long.parseLong(duplicate.get("id").toString()));
+        doNotProcessList.add(Long.parseLong(thing.get("id").toString()));
+        doNotProcessList.add(Long.parseLong(duplicate.get("id").toString()));
 
 
-        return buildCsvRow(getLineMap(action, serial, id, String.valueOf(isParent), String.valueOf(isInCsv), duplicateId, duplicateSerial, String.valueOf(duplicateIsParent)));
+        return buildCsvRow(getLineMap(action,
+                serial,
+                id,
+                String.valueOf(isParent),
+                String.valueOf(isInCsv),
+                getValue(thing, thingFieldNameMap, fieldValue),
+                duplicateId,
+                duplicateSerial,
+                String.valueOf(duplicateIsParent), getValue(duplicate, thingFieldNameMap, duplicateFieldValue)));
     }
 
     public static Map<String, Object> getLineMap(String action,
@@ -227,9 +384,11 @@ public class DuplicateFinder {
                                                  String id,
                                                  String isParent,
                                                  String isInCsv,
+                                                 String plant,
                                                  String duplicateId,
                                                  String duplicateSerial,
-                                                 String duplicateIsParent) {
+                                                 String duplicateIsParent,
+                                                 String duplicatePlant) {
         Map<String, Object> out = new HashMap<>();
         out.put("Action", action);
         out.put("Date", new Date());
@@ -237,9 +396,11 @@ public class DuplicateFinder {
         out.put("Id", id);
         out.put("IsInCsv", isInCsv);
         out.put("IsParent", isParent);
+        out.put("Plant", plant);
         out.put("DuplicateId", duplicateId == null ? "" : duplicateId);
         out.put("DuplicateSerial", duplicateSerial == null ? "" : duplicateSerial);
         out.put("DuplicateIsParent", duplicateIsParent);
+        out.put("DuplicatePlant", duplicatePlant);
         return out;
     }
 
@@ -288,10 +449,9 @@ public class DuplicateFinder {
 
                     valueConverted.put("field_id", tf);
 
-                    if(!fieldValueHistory.containsKey(tf)){
-                        fieldValueHistory.get(tf).add(new HashMap<String, Object>());
+                    if (!fieldValueHistory.containsKey(tf)) {
+                        fieldValueHistory.put(tf, new ArrayList<Map<String, Object>>());
                     }
-
                     fieldValueHistory.get(tf).add(valueConverted);
 
                 }
@@ -301,7 +461,7 @@ public class DuplicateFinder {
     }
 
     private static String deleteThing(Map<String, Object> thingMap,
-                                      List<Long> thingFieldList) throws SQLException {
+                                      List<Long> thingFieldList, String plant, String duplicatePlant, Boolean isParent, Boolean contains) throws SQLException {
 
         String action = "FOR DELETING";
 
@@ -322,16 +482,19 @@ public class DuplicateFinder {
 
         return buildCsvRow(getLineMap(action,
                 thingMap.get("serial").toString(),
-                thingMap.get("id").toString(), "false", "false", "", "", ""));
+                thingMap.get("id").toString(),
+                plant,
+                String.valueOf(isParent),
+                String.valueOf(contains), "", "", "", duplicatePlant));
 
     }
 
-    private static String doNothing(Map<String, Object> thingMap, boolean contains, boolean isParent) {
+    private static String doNothing(Map<String, Object> thingMap, String plant, String duplicatePlant, Boolean contains, Boolean isParent) {
 
         String action = "KEEP(NO ACTION)";
 
         return buildCsvRow(getLineMap(action, thingMap.get("serial").toString(),
-                thingMap.get("id").toString(), String.valueOf(isParent), String.valueOf(contains), "", "", ""));
+                thingMap.get("id").toString(), plant, String.valueOf(isParent), contains == null ? "" : String.valueOf(contains), "", "", "", duplicatePlant));
     }
 
     private static void saveResultsToFile(List<String> results) throws IOException {
@@ -472,7 +635,10 @@ public class DuplicateFinder {
         }
     }
 
-    public static boolean init(String[] args) throws ClassNotFoundException, SQLException, InstantiationException, IllegalAccessException {
+    public static boolean init(String[] args) throws ClassNotFoundException,
+            SQLException,
+            InstantiationException,
+            IllegalAccessException {
         loadDefaultConfig();
 
 
@@ -486,14 +652,14 @@ public class DuplicateFinder {
 
         if (line.hasOption("p")) {
             ArgsCache.parentThingTypeCode = line.getOptionValue("p");
-        }else{
+        } else {
             System.out.println("Parent thing type code required (use -p <thingTypeCode>)");
             return false;
         }
 
         if (line.hasOption("c")) {
             ArgsCache.childrenThingTypeCode = line.getOptionValue("c");
-        }else{
+        } else {
             System.out.println("Children thing type code required (use -c <thingTypeCode>)");
             return false;
         }
@@ -502,6 +668,9 @@ public class DuplicateFinder {
             ArgsCache.udfKey = line.getOptionValue("q").split("=")[0];
             ArgsCache.udFValue = line.getOptionValue("q").split("=")[1];
         }
+
+        ArgsCache.restrictQuery = line.hasOption("r");
+
 
 //        if (line.hasOption("g")) {
 //            ArgsCache.groupCode = line.getOptionValue("g");
@@ -543,16 +712,15 @@ public class DuplicateFinder {
 
         //mainMenu();
         try {
-            if(init(args)){
+            if (init(args)) {
                 System.out.println("Analysing...");
                 long ti = System.currentTimeMillis();
-                cleanWithCsv();
+                run();
                 System.out.println("Done finding duplicates (elapsed time " + ((System.currentTimeMillis() - ti) / 1000) + " seconds)");
                 System.exit(0);
-            }else{
+            } else {
                 System.exit(-1);
             }
-
 
 
         } catch (Exception e) {

@@ -21,15 +21,18 @@ public class ArgsParser {
 
     public void addOptions()
     {
+        options.addOption( "d", "delete", false, "Delete duplicates without prompt" );
+
+        options.addOption( "r", "restrict", false, "Restrict find duplicates in UDf query results" );
+
         options.addOption( "p", "parentThingType", true, "Thing type code of the parent" );
 
         options.addOption( "c", "childrenThingType", true, "Thing type code of the children" );
 
         options.addOption( "f", "file", true, "Csv file to search on" );
 
-        options.addOption( "d", "delete", false, "Delete duplicates without prompt" );
+        options.addOption( "q", "query", true, "UDF query filter" );
 
-        options.addOption( "q", "query", true, "Udf query filter" );
     }
 
     public CommandLine parseOptions( String[] args )
