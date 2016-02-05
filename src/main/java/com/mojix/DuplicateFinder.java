@@ -109,7 +109,7 @@ public class DuplicateFinder {
                             results.add(doNothing(thing, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, fieldValue), contains, isParent));
                         }
                     } else {
-                        results.add(deleteThing(thing,
+                        results.add(deleteThing(thing,duplicate,
                                 thingFieldMap.get(Long.parseLong(thing.get("id").toString())), getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, fieldValue), isParent, contains));
                     }
                 } else if (duplicate != null) {
@@ -231,7 +231,7 @@ public class DuplicateFinder {
                                                            Map<Long, List<Map<String, Object>>> fieldValue) {
         List<Map<String, Object>> result = new ArrayList<>();
 
-        if (ArgsCache.udFValue != null && ArgsCache.udfKey != null) {
+        if (ArgsCache.udFValue != null && ArgsCache.udfKey != null && !ArgsCache.udFValue.equals("ALL")) {
             for (Map<String, Object> thing : things) {
                 if (fieldValue.containsKey(Long.parseLong(thing.get("id").toString())) &&
                         getValue(thing, thingFieldNameMap, fieldValue).equals(ArgsCache.udFValue)) {
@@ -310,10 +310,27 @@ public class DuplicateFinder {
         String duplicateId = "";
 
         if (isInCsv) {
-            if (duplicateIsParent) {
+            if(isParent){
+//                isParent = true;
+//                duplicateIsParent = false;
 
-                isParent = true;
-                duplicateIsParent = false;
+                id = thing.get("id").toString();
+                serial = thing.get("serial").toString();
+                duplicateId = duplicate.get("id").toString();
+                duplicateSerial = duplicate.get("serial").toString();
+
+                if (ArgsCache.delete) {
+                    mergeThingData(thing, fieldValue, fieldValueHistory, duplicate,
+                            duplicateFieldValue, duplicateFieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
+                    deleteThing(duplicate,thing, duplicateThingFieldList, getValue(thing, thingFieldNameMap, duplicateFieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
+                    action = "MERGED";
+                } else {
+                    action = "FOR MERGING";
+                }
+            }else if (duplicateIsParent) {
+
+//                isParent = true;
+//                duplicateIsParent = false;
 
                 id = duplicate.get("id").toString();
                 serial = duplicate.get("serial").toString();
@@ -323,7 +340,7 @@ public class DuplicateFinder {
                 if (ArgsCache.delete) {
                     mergeThingData(duplicate, duplicateFieldValue, duplicateFieldValueHistory,
                             thing, fieldValue, fieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
-                    deleteThing(thing, thingFieldList, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
+                    deleteThing(thing,duplicate, thingFieldList, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
                     action = "MERGED";
                 } else {
                     action = "FOR MERGING";
@@ -338,7 +355,7 @@ public class DuplicateFinder {
                 if (ArgsCache.delete) {
                     mergeThingData(thing, fieldValue, fieldValueHistory, duplicate,
                             duplicateFieldValue, duplicateFieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
-                    deleteThing(duplicate, duplicateThingFieldList, getValue(thing, thingFieldNameMap, duplicateFieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
+                    deleteThing(duplicate,thing, duplicateThingFieldList, getValue(thing, thingFieldNameMap, duplicateFieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
                     action = "MERGED";
                 } else {
                     action = "FOR MERGING";
@@ -356,7 +373,7 @@ public class DuplicateFinder {
             if (ArgsCache.delete) {
                 mergeThingData(thing, fieldValue, fieldValueHistory, duplicate,
                         duplicateFieldValue, duplicateFieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
-                deleteThing(duplicate, duplicateThingFieldList, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
+                deleteThing(duplicate,thing, duplicateThingFieldList, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
                 action = "MERGED";
             } else {
                 action = "FOR MERGING";
@@ -460,15 +477,19 @@ public class DuplicateFinder {
     }
 
     private static String deleteThing(Map<String, Object> thingMap,
+                                      Map<String, Object> duplicate,
                                       List<Long> thingFieldList, String plant, String duplicatePlant, Boolean isParent, Boolean contains) throws SQLException {
 
         String action = "FOR DELETING";
 
         if (ArgsCache.delete) {
 
-            DbDAO.getInstance().deleteThing((long) thingMap.get("id"), ArgsCache.database);
-            CassandraDAO.getInstance().deleteThing(thingFieldList);
-            action = "DELETED";
+            if(DbDAO.getInstance().deleteThing(thingMap, ArgsCache.database)){
+                CassandraDAO.getInstance().deleteThing(thingFieldList);
+                action = "DELETED";
+            }else{
+                action = "ERROR NOT DELETED";
+            }
         }
 
 //        Map<String, Object> out = new HashMap<>();
@@ -482,9 +503,10 @@ public class DuplicateFinder {
         return buildCsvRow(getLineMap(action,
                 thingMap.get("serial").toString(),
                 thingMap.get("id").toString(),
-                plant,
                 String.valueOf(isParent),
-                String.valueOf(contains), "", "", "", duplicatePlant));
+                String.valueOf(contains),
+                plant,
+                "", "", "", duplicatePlant));
 
     }
 

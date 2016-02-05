@@ -317,8 +317,30 @@ public class DbDAO {
         conn = DriverManager.getConnection(url, userName, password);
     }
 
-    public void deleteThing(Long thingId,
-                           String database) throws SQLException {
+    public boolean deleteThing(Map<String, Object> thingId,
+                            String database) throws SQLException {
+        if(thingId.get("parentId")!= null){
+            String sqlT = "DELETE FROM dbo.apc_thing WHERE id=?";
+            String sqlTf = "DELETE FROM thingField WHERE thing_id=?";
+            if (conn != null && database.equals("mysql")) {
+                sqlT = sqlT.replaceAll("dbo.","");
+            } else if (conn != null && database.equals("mssql")) {
+
+            }
+            PreparedStatement statementTf = conn.prepareStatement(sqlTf);
+            statementTf.setLong(1, Long.parseLong(thingId.get("parent_id").toString()));
+            statementTf.executeUpdate();
+
+            PreparedStatement statementT = conn.prepareStatement(sqlT);
+            statementT.setLong(1, Long.parseLong(thingId.get("parent_id").toString()));
+            try{
+                statementT.executeUpdate();
+            }catch (Exception e){
+                return false;
+            }
+
+
+        }
         String sqlT = "DELETE FROM dbo.apc_thing WHERE id=?";
         String sqlTf = "DELETE FROM thingField WHERE thing_id=?";
         if (conn != null && database.equals("mysql")) {
@@ -327,12 +349,17 @@ public class DbDAO {
 
         }
         PreparedStatement statementTf = conn.prepareStatement(sqlTf);
-        statementTf.setLong(1, thingId);
+        statementTf.setLong(1, Long.parseLong(thingId.get("id").toString()));
         statementTf.executeUpdate();
 
         PreparedStatement statementT = conn.prepareStatement(sqlT);
-        statementT.setLong(1, thingId);
-        statementT.executeUpdate();
+        statementT.setLong(1, Long.parseLong(thingId.get("id").toString()));
+        try{
+            statementT.executeUpdate();
+        }catch (Exception e){
+            return  false;
+        }
+        return true;
     }
 
     public void closeConnection() throws SQLException {
