@@ -80,11 +80,15 @@ public class DuplicateFinder {
         for (Map<String, Object> thing : filteredThings) {
 
             if (!doNotProcessList.contains(Long.parseLong(thing.get("id").toString()))) {
+
                 boolean isInCsv = csvContains(thing.get("serial").toString(), csvFileList);
                 boolean isParent = isParent(thing.get("serial").toString(), thingMap.get(ArgsCache.childrenThingTypeCode));
                 Map<String, Object> duplicate = getDuplicate(thing.get("serial").toString(),
                         (long) thing.get("id"),
                         ArgsCache.restrictQuery ? filteredThings : thingMap.get(ArgsCache.parentThingTypeCode));
+
+                doNotProcessList.add(Long.parseLong(thing.get("id").toString()));
+                if (duplicate != null) doNotProcessList.add(Long.parseLong(duplicate.get("id").toString()));
 
                 if (!isInCsv) {
                     if (isParent) {
@@ -149,25 +153,39 @@ public class DuplicateFinder {
         System.out.println("\rAnalysing csv and databases values [OK]");
         saveResultsToFile(results);
 
-        List<String> csvNoDb = new ArrayList<>();
-
-
-        for (Map<String, Object> row : csvFileList) {
-            boolean is = false;
-            for (Map<String, Object> thing : thingMap.get(ArgsCache.parentThingTypeCode)) {
-                if (thing.get("serial").toString().equals(row.get("serial"))) {
-                    is = true;
+        if (ArgsCache.verbose) {
+            System.out.println("\nCalculating results");
+            long countCsvNotInDB = 0;
+            for (Map<String, Object> row : csvFileList) {
+                boolean is = false;
+                for (Map<String, Object> thing : filteredThings) {
+                    if (row.get("serial").toString().equals(thing.get("serial").toString())) {
+                        is = true;
+                        break;
+                    }
+                }
+                if (!is) {
+                    countCsvNotInDB++;
                 }
             }
-            if (!is && !csvNoDb.contains(row.get("serial").toString())) {
-                csvNoDb.add(row.get("serial").toString());
+
+            long countDBNotInCsv = 0;
+            for (Map<String, Object> thing : filteredThings) {
+                boolean found = false;
+                for (Map<String, Object> row : csvFileList) {
+                    if (row.get("serial").toString().equals(thing.get("serial").toString())) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    countDBNotInCsv++;
+                }
             }
-        }
-        if (ArgsCache.verbose) {
-            System.out.println("In csv and not in db " + csvNoDb.size() + " ---- " + csvNoDb);
-            System.out.println("Not in csv and parent and duplicated " + noCsvParent.size() + " ---- " + noCsvParent);
-            System.out.println("Not in csv and parent and no duplicate" + noCsvParentNoDuplicate.size() + " ---- " + noCsvParentNoDuplicate);
-            System.out.println("InCsv and not duplicate " + csvNoDuplicate.size() + " ---- " + csvNoDuplicate);
+            System.out.println("In csv and not in db " + countCsvNotInDB);
+            System.out.println("In db and not in csv " + countDBNotInCsv);
+            System.out.println("Total db " + filteredThings.size());
+            System.out.println("Total csv " + csvFileList.size());
         }
 
     }
@@ -450,10 +468,6 @@ public class DuplicateFinder {
             }
         }
 
-        doNotProcessList.add(Long.parseLong(thing.get("id").toString()));
-        doNotProcessList.add(Long.parseLong(duplicate.get("id").toString()));
-
-
         return buildCsvRow(getLineMap(action,
                 serial,
                 id,
@@ -642,16 +656,14 @@ public class DuplicateFinder {
 
     private static boolean csvContains(String serial,
                                        List<Map<String, Object>> csvFileList) {
-        boolean result = false;
         for (Map<String, Object> item : csvFileList) {
             if (item.get("serial").toString() != null) {
-                result = item.get("serial").toString().equals(serial);
-                if (result) {
-                    break;
+                if (item.get("serial").toString().equals(serial)) {
+                    return true;
                 }
             }
         }
-        return result;
+        return false;
     }
 
     private static boolean isParent(String serial,
