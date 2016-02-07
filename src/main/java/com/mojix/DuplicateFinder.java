@@ -80,13 +80,13 @@ public class DuplicateFinder {
         for (Map<String, Object> thing : filteredThings) {
 
             if (!doNotProcessList.contains(Long.parseLong(thing.get("id").toString()))) {
-                boolean contains = csvContains(thing.get("serial").toString(), csvFileList);
+                boolean isInCsv = csvContains(thing.get("serial").toString(), csvFileList);
                 boolean isParent = isParent(thing.get("serial").toString(), thingMap.get(ArgsCache.childrenThingTypeCode));
                 Map<String, Object> duplicate = getDuplicate(thing.get("serial").toString(),
                         (long) thing.get("id"),
                         ArgsCache.restrictQuery ? filteredThings : thingMap.get(ArgsCache.parentThingTypeCode));
 
-                if (!contains && ArgsCache.csvFile != null) {
+                if (!isInCsv) {
                     if (isParent) {
                         if (!noCsvParent.contains(thing.get("serial").toString()))
                             noCsvParent.add(thing.get("serial").toString());
@@ -100,13 +100,17 @@ public class DuplicateFinder {
                                     fieldValue.get(Long.parseLong(duplicate.get("id").toString())),
                                     fieldValueHistory.get(Long.parseLong(duplicate.get("id").toString())),
                                     thingMap.get(ArgsCache.childrenThingTypeCode),
-                                    isParent, contains,
+                                    isParent, isInCsv,
                                     thingFieldToThingTypeFieldMap,
                                     thingTypeFieldToThingFieldMap, thingFieldNameMap));
                         } else {
                             if (!noCsvParentNoDuplicate.contains(thing.get("serial").toString()))
                                 noCsvParentNoDuplicate.add(thing.get("serial").toString());
-                            results.add(doNothing(thing, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, fieldValue), contains, isParent));
+                            results.add(doNothing(thing,
+                                    getValue(thing, thingFieldNameMap, fieldValue),
+                                    getValue(duplicate, thingFieldNameMap, fieldValue),
+                                    isInCsv,
+                                    isParent));
                         }
                     } else {
                         results.add(deleteThing(thing,
@@ -114,7 +118,7 @@ public class DuplicateFinder {
                                 getValue(thing, thingFieldNameMap, fieldValue),
                                 getValue(duplicate, thingFieldNameMap, fieldValue),
                                 isParent,
-                                contains));
+                                isInCsv));
                     }
                 } else if (duplicate != null) {
                     results.add(mergeThing(thing,
@@ -126,11 +130,15 @@ public class DuplicateFinder {
                             fieldValue.get(Long.parseLong(duplicate.get("id").toString())),
                             fieldValueHistory.get(Long.parseLong(duplicate.get("id").toString())),
                             thingMap.get(ArgsCache.childrenThingTypeCode),
-                            isParent, contains, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap, thingFieldNameMap));
+                            isParent, isInCsv, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap, thingFieldNameMap));
                 } else {
                     if (!csvNoDuplicate.contains(thing.get("serial").toString()))
                         csvNoDuplicate.add(thing.get("serial").toString());
-                    results.add(doNothing(thing, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, fieldValue), contains, isParent));
+                    results.add(doNothing(thing,
+                            getValue(thing, thingFieldNameMap, fieldValue),
+                            getValue(duplicate, thingFieldNameMap, fieldValue),
+                            isInCsv,
+                            isParent));
                 }
             }
             countT++;
@@ -216,7 +224,10 @@ public class DuplicateFinder {
                             thingFieldToThingTypeFieldMap,
                             thingTypeFieldToThingFieldMap, thingFieldNameMap));
                 } else {
-                    results.add(doNothing(thing, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, fieldValue), true, isParent));
+                    results.add(doNothing(thing,
+                            getValue(thing, thingFieldNameMap, fieldValue),
+                            getValue(duplicate, thingFieldNameMap, fieldValue),
+                            true, isParent));
                 }
             }
             countT++;
@@ -427,7 +438,12 @@ public class DuplicateFinder {
                         duplicateFieldValueHistory,
                         thingFieldToThingTypeFieldMap,
                         thingTypeFieldToThingFieldMap);
-                deleteThing(duplicate, duplicateThingFieldList, getValue(duplicate, thingFieldNameMap, duplicateFieldValue), getValue(thing, thingFieldNameMap, fieldValue), isParent, isInCsv);
+                deleteThing(duplicate,
+                        duplicateThingFieldList,
+                        getValue(duplicate, thingFieldNameMap, duplicateFieldValue),
+                        getValue(thing, thingFieldNameMap, fieldValue),
+                        isParent,
+                        isInCsv);
                 action = "MERGED";
             } else {
                 action = "FOR MERGING";
@@ -569,12 +585,24 @@ public class DuplicateFinder {
 
     }
 
-    private static String doNothing(Map<String, Object> thingMap, String plant, String duplicatePlant, Boolean contains, Boolean isParent) {
+    private static String doNothing(Map<String, Object> thingMap,
+                                    String plant,
+                                    String duplicatePlant,
+                                    Boolean isInCsv,
+                                    Boolean isParent) {
 
         String action = "KEEP(NO ACTION)";
 
-        return buildCsvRow(getLineMap(action, thingMap.get("serial").toString(),
-                thingMap.get("id").toString(), plant, String.valueOf(isParent), contains == null ? "" : String.valueOf(contains), "", "", "", duplicatePlant));
+        return buildCsvRow(getLineMap(action,
+                thingMap.get("serial").toString(),
+                thingMap.get("id").toString(),
+                String.valueOf(isParent),
+                isInCsv == null ? "" : String.valueOf(isInCsv),
+                plant,
+                "",
+                "",
+                "",
+                duplicatePlant));
     }
 
     private static void saveResultsToFile(List<String> results) throws IOException {
