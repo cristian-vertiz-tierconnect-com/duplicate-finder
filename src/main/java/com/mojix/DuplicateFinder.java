@@ -109,8 +109,12 @@ public class DuplicateFinder {
                             results.add(doNothing(thing, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, fieldValue), contains, isParent));
                         }
                     } else {
-                        results.add(deleteThing(thing,duplicate,
-                                thingFieldMap.get(Long.parseLong(thing.get("id").toString())), getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, fieldValue), isParent, contains));
+                        results.add(deleteThing(thing,
+                                thingFieldMap.get(Long.parseLong(thing.get("id").toString())),
+                                getValue(thing, thingFieldNameMap, fieldValue),
+                                getValue(duplicate, thingFieldNameMap, fieldValue),
+                                isParent,
+                                contains));
                     }
                 } else if (duplicate != null) {
                     results.add(mergeThing(thing,
@@ -306,11 +310,13 @@ public class DuplicateFinder {
         String action = "";
         String serial = "";
         String id = "";
+        String value = "";
         String duplicateSerial = "";
         String duplicateId = "";
+        String duplicateValue = "";
 
         if (isInCsv) {
-            if(isParent){
+            if (isParent) {
 //                isParent = true;
 //                duplicateIsParent = false;
 
@@ -318,16 +324,29 @@ public class DuplicateFinder {
                 serial = thing.get("serial").toString();
                 duplicateId = duplicate.get("id").toString();
                 duplicateSerial = duplicate.get("serial").toString();
+                value = getValue(thing, thingFieldNameMap, fieldValue);
+                duplicateValue = getValue(duplicate, thingFieldNameMap, duplicateFieldValue);
 
                 if (ArgsCache.delete) {
-                    mergeThingData(thing, fieldValue, fieldValueHistory, duplicate,
-                            duplicateFieldValue, duplicateFieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
-                    deleteThing(duplicate,thing, duplicateThingFieldList, getValue(thing, thingFieldNameMap, duplicateFieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
+                    mergeThingData(thing,
+                            fieldValue,
+                            fieldValueHistory,
+                            duplicate,
+                            duplicateFieldValue,
+                            duplicateFieldValueHistory,
+                            thingFieldToThingTypeFieldMap,
+                            thingTypeFieldToThingFieldMap);
+                    deleteThing(duplicate,
+                            duplicateThingFieldList,
+                            getValue(duplicate, thingFieldNameMap, duplicateFieldValue),
+                            getValue(thing, thingFieldNameMap, fieldValue),
+                            isParent,
+                            isInCsv);
                     action = "MERGED";
                 } else {
                     action = "FOR MERGING";
                 }
-            }else if (duplicateIsParent) {
+            } else if (duplicateIsParent) {
 
 //                isParent = true;
 //                duplicateIsParent = false;
@@ -336,11 +355,24 @@ public class DuplicateFinder {
                 serial = duplicate.get("serial").toString();
                 duplicateId = thing.get("id").toString();
                 duplicateSerial = thing.get("serial").toString();
+                value = getValue(duplicate, thingFieldNameMap, duplicateFieldValue);
+                duplicateValue = getValue(thing, thingFieldNameMap, fieldValue);
 
                 if (ArgsCache.delete) {
-                    mergeThingData(duplicate, duplicateFieldValue, duplicateFieldValueHistory,
-                            thing, fieldValue, fieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
-                    deleteThing(thing,duplicate, thingFieldList, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
+                    mergeThingData(duplicate,
+                            duplicateFieldValue,
+                            duplicateFieldValueHistory,
+                            thing,
+                            fieldValue,
+                            fieldValueHistory,
+                            thingFieldToThingTypeFieldMap,
+                            thingTypeFieldToThingFieldMap);
+                    deleteThing(thing,
+                            thingFieldList,
+                            getValue(thing, thingFieldNameMap, fieldValue),
+                            getValue(duplicate, thingFieldNameMap, duplicateFieldValue),
+                            isParent,
+                            isInCsv);
                     action = "MERGED";
                 } else {
                     action = "FOR MERGING";
@@ -351,11 +383,24 @@ public class DuplicateFinder {
                 serial = thing.get("serial").toString();
                 duplicateId = duplicate.get("id").toString();
                 duplicateSerial = duplicate.get("serial").toString();
+                value = getValue(thing, thingFieldNameMap, fieldValue);
+                duplicateValue = getValue(duplicate, thingFieldNameMap, duplicateFieldValue);
 
                 if (ArgsCache.delete) {
-                    mergeThingData(thing, fieldValue, fieldValueHistory, duplicate,
-                            duplicateFieldValue, duplicateFieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
-                    deleteThing(duplicate,thing, duplicateThingFieldList, getValue(thing, thingFieldNameMap, duplicateFieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
+                    mergeThingData(thing,
+                            fieldValue,
+                            fieldValueHistory,
+                            duplicate,
+                            duplicateFieldValue,
+                            duplicateFieldValueHistory,
+                            thingFieldToThingTypeFieldMap,
+                            thingTypeFieldToThingFieldMap);
+                    deleteThing(duplicate,
+                            duplicateThingFieldList,
+                            getValue(duplicate, thingFieldNameMap, duplicateFieldValue),
+                            getValue(thing, thingFieldNameMap, fieldValue),
+                            isParent,
+                            isInCsv);
                     action = "MERGED";
                 } else {
                     action = "FOR MERGING";
@@ -369,11 +414,20 @@ public class DuplicateFinder {
             serial = thing.get("serial").toString();
             duplicateId = duplicate.get("id").toString();
             duplicateSerial = duplicate.get("serial").toString();
+            value = getValue(thing, thingFieldNameMap, fieldValue);
+            duplicateValue = getValue(duplicate, thingFieldNameMap, duplicateFieldValue);
+
 
             if (ArgsCache.delete) {
-                mergeThingData(thing, fieldValue, fieldValueHistory, duplicate,
-                        duplicateFieldValue, duplicateFieldValueHistory, thingFieldToThingTypeFieldMap, thingTypeFieldToThingFieldMap);
-                deleteThing(duplicate,thing, duplicateThingFieldList, getValue(thing, thingFieldNameMap, fieldValue), getValue(duplicate, thingFieldNameMap, duplicateFieldValue), isParent, isInCsv);
+                mergeThingData(thing,
+                        fieldValue,
+                        fieldValueHistory,
+                        duplicate,
+                        duplicateFieldValue,
+                        duplicateFieldValueHistory,
+                        thingFieldToThingTypeFieldMap,
+                        thingTypeFieldToThingFieldMap);
+                deleteThing(duplicate, duplicateThingFieldList, getValue(duplicate, thingFieldNameMap, duplicateFieldValue), getValue(thing, thingFieldNameMap, fieldValue), isParent, isInCsv);
                 action = "MERGED";
             } else {
                 action = "FOR MERGING";
@@ -389,10 +443,11 @@ public class DuplicateFinder {
                 id,
                 String.valueOf(isParent),
                 String.valueOf(isInCsv),
-                getValue(thing, thingFieldNameMap, fieldValue),
+                value,
                 duplicateId,
                 duplicateSerial,
-                String.valueOf(duplicateIsParent), getValue(duplicate, thingFieldNameMap, duplicateFieldValue)));
+                String.valueOf(duplicateIsParent),
+                duplicateValue));
     }
 
     public static Map<String, Object> getLineMap(String action,
@@ -477,17 +532,21 @@ public class DuplicateFinder {
     }
 
     private static String deleteThing(Map<String, Object> thingMap,
-                                      Map<String, Object> duplicate,
-                                      List<Long> thingFieldList, String plant, String duplicatePlant, Boolean isParent, Boolean contains) throws SQLException {
+                                      //Map<String, Object> duplicate,
+                                      List<Long> thingFieldList,
+                                      String plant,
+                                      String duplicatePlant,
+                                      Boolean isParent,
+                                      Boolean contains) throws SQLException {
 
         String action = "FOR DELETING";
 
         if (ArgsCache.delete) {
 
-            if(DbDAO.getInstance().deleteThing(thingMap, ArgsCache.database)){
+            if (DbDAO.getInstance().deleteThing(thingMap, ArgsCache.database)) {
                 CassandraDAO.getInstance().deleteThing(thingFieldList);
                 action = "DELETED";
-            }else{
+            } else {
                 action = "ERROR NOT DELETED";
             }
         }

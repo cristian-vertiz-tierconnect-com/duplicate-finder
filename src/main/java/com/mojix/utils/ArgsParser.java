@@ -25,6 +25,8 @@ public class ArgsParser {
 
         options.addOption( "r", "restrict", false, "Restrict find duplicates in UDf query results" );
 
+        options.addOption( "v", "verbose", false, "Shows extra info" );
+
         options.addOption( "p", "parentThingType", true, "Thing type code of the parent" );
 
         options.addOption( "c", "childrenThingType", true, "Thing type code of the children" );
