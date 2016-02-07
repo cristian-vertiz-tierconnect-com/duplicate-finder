@@ -35,6 +35,8 @@ public class ArgsParser {
 
         options.addOption( "q", "query", true, "UDF query filter" );
 
+        options.addOption( "v", "verbose", true, "Shows extra information" );
+
     }
 
     public CommandLine parseOptions( String[] args )

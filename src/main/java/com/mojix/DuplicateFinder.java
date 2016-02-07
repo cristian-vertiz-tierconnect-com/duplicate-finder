@@ -751,6 +751,8 @@ public class DuplicateFinder {
 
         ArgsCache.restrictQuery = line.hasOption("r");
 
+        ArgsCache.verbose = line.hasOption("v");
+
 
 //        if (line.hasOption("g")) {
 //            ArgsCache.groupCode = line.getOptionValue("g");
