@@ -27,6 +27,8 @@ public class ArgsParser {
 
         options.addOption( "v", "verbose", false, "Shows extra info" );
 
+        options.addOption( "v", "verbose", false, "Shows extra information" );
+
         options.addOption( "p", "parentThingType", true, "Thing type code of the parent" );
 
         options.addOption( "c", "childrenThingType", true, "Thing type code of the children" );
@@ -35,7 +37,6 @@ public class ArgsParser {
 
         options.addOption( "q", "query", true, "UDF query filter" );
 
-        options.addOption( "v", "verbose", true, "Shows extra information" );
 
     }
 
