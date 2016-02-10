@@ -153,6 +153,8 @@ public class DuplicateFinder {
         System.out.println("\rAnalysing csv and databases values [OK]");
         saveResultsToFile(results);
 
+        List <String> csvNotInDb = new ArrayList<>();
+
         if (ArgsCache.verbose) {
             System.out.println("\nCalculating results");
             long countCsvNotInDB = 0;
@@ -166,6 +168,7 @@ public class DuplicateFinder {
                 }
                 if (!is) {
                     countCsvNotInDB++;
+                    csvNotInDb.add (row.get("serial").toString());
                 }
             }
 
@@ -182,7 +185,7 @@ public class DuplicateFinder {
                     countDBNotInCsv++;
                 }
             }
-            System.out.println("In csv and not in db " + countCsvNotInDB);
+            System.out.println("In csv and not in db " + countCsvNotInDB + " " + csvNotInDb);
             System.out.println("In db and not in csv " + countDBNotInCsv);
             System.out.println("Total db " + filteredThings.size());
             System.out.println("Total csv " + csvFileList.size());
